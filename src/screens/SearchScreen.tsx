@@ -1,11 +1,14 @@
 import React from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import type {SmartCategory} from '../domain/organization/smartGrouping';
 import {ScreenshotGrid} from '../components/ScreenshotGrid';
 import {useFilteredScreenshots} from '../hooks/useFilteredScreenshots';
 import {useFilterStore} from '../store/useFilterStore';
+import {useIntelligenceStore} from '../store/useIntelligenceStore';
 import {useScreenshotStore} from '../store/useScreenshotStore';
 import {useThemeStore} from '../store/useThemeStore';
+import {trackEvent} from '../services/observability/analytics';
 import type {SearchScreenProps} from '../types';
 
 export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
@@ -21,10 +24,24 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
   const setSearchQuery = useFilterStore((state) => state.setSearchQuery);
   const activeTag = useFilterStore((state) => state.activeTag);
   const setActiveTag = useFilterStore((state) => state.setActiveTag);
+  const selectedSmartCategory = useIntelligenceStore((state) => state.selectedSmartCategory);
+  const setSelectedSmartCategory = useIntelligenceStore((state) => state.setSelectedSmartCategory);
+  const recentQueries = useIntelligenceStore((state) => state.recentQueries);
+  const saveQuery = useIntelligenceStore((state) => state.saveQuery);
 
   const {filteredScreenshots, allTags} = useFilteredScreenshots();
 
   const selectionMode = selectedScreenshots.length > 0;
+
+  const categories: Array<SmartCategory | 'all'> = [
+    'all',
+    'receipt',
+    'shopping',
+    'code',
+    'design',
+    'docs',
+    'social',
+  ];
 
   return (
     <View style={[styles.container, {backgroundColor: theme.colors.background}]}> 
@@ -37,14 +54,61 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
           <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.muted} />
           <TextInput
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(value) => {
+              setSearchQuery(value);
+              if (value.trim().length > 2) {
+                trackEvent('search_typing', {length: value.length});
+              }
+            }}
             placeholder="Search by name or tags"
             placeholderTextColor={theme.colors.muted}
             style={[styles.input, {color: theme.colors.text}]}
             autoFocus
+            returnKeyType="search"
+            onSubmitEditing={() => {
+              saveQuery(searchQuery);
+              trackEvent('search_submit', {query: searchQuery});
+            }}
           />
         </View>
       </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.commandBar}>
+        {categories.map((category) => {
+          const active = selectedSmartCategory === category;
+
+          return (
+            <Pressable
+              key={category}
+              onPress={() => setSelectedSmartCategory(category)}
+              style={[
+                styles.commandChip,
+                {
+                  backgroundColor: active ? theme.colors.primary : theme.colors.surface,
+                  borderColor: theme.colors.border,
+                },
+              ]}>
+              <Text style={[styles.commandChipLabel, {color: active ? '#ffffff' : theme.colors.text}]}>
+                {category === 'all' ? 'All' : category}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {recentQueries.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentWrap}>
+          {recentQueries.map((query) => (
+            <Pressable
+              key={query}
+              style={[styles.recentChip, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}
+              onPress={() => setSearchQuery(query)}>
+              <MaterialCommunityIcons name="history" size={13} color={theme.colors.muted} />
+              <Text style={[styles.recentLabel, {color: theme.colors.text}]}>{query}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
 
       <ScrollView
         horizontal
@@ -172,6 +236,40 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   tagLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  commandBar: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    gap: 8,
+  },
+  commandChip: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  commandChipLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  recentWrap: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  recentChip: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  recentLabel: {
     fontSize: 12,
     fontWeight: '600',
   },

@@ -1,8 +1,8 @@
-import type {PhotoIdentifier} from '@react-native-camera-roll/camera-roll';
+import type { PhotoIdentifier } from '@react-native-camera-roll/camera-roll';
 import type { Screenshot } from '../types';
 
-
-const SCREENSHOT_PATTERN = /(screenshot|screen[ _-]?shot|screen_capture|截屏|스크린샷|スクリーンショット)/i;
+const SCREENSHOT_PATTERN =
+  /(screenshot|screen[ _-]?shot|screen_capture|截屏|스크린샷|スクリーンショット)/i;
 
 const toIsoDate = (timestamp: number | undefined): string => {
   if (!timestamp || Number.isNaN(timestamp)) {
@@ -23,7 +23,8 @@ const getFallbackName = (uri: string, createdAt: string): string => {
   return `screenshot-${createdAt}`;
 };
 
-export const isLikelyScreenshot = (fileName: string): boolean => SCREENSHOT_PATTERN.test(fileName);
+export const isLikelyScreenshot = (fileName: string, uri: any): boolean =>
+  SCREENSHOT_PATTERN.test(fileName);
 
 export const mapCameraRollPhoto = (
   edge: PhotoIdentifier,

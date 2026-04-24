@@ -1,19 +1,20 @@
 import {create} from 'zustand';
 import type {AppTheme, ThemeState} from '../types';
+import {designTokens} from '../theme/tokens';
 import {useFilterStore} from './useFilterStore';
 import {useScreenshotStore} from './useScreenshotStore';
 
 const lightTheme: AppTheme = {
   isDark: false,
   colors: {
-    background: '#f4f5f7',
-    surface: '#ffffff',
-    text: '#1f2933',
-    primary: '#0b7a75',
-    border: '#d8dee9',
-    muted: '#627182',
-    danger: '#c92a2a',
-    success: '#2b8a3e',
+    background: designTokens.color.background,
+    surface: designTokens.color.surface,
+    text: designTokens.color.text,
+    primary: designTokens.color.primary,
+    border: designTokens.color.border,
+    muted: designTokens.color.muted,
+    danger: designTokens.color.danger,
+    success: designTokens.color.success,
   },
 };
 

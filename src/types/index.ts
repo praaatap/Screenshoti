@@ -6,15 +6,18 @@ export interface Screenshot {
   fileName: string;
   fileSize: number;
   createdAt: string;
+  note?: string;
   tags: string[];
   isFavorite: boolean;
   albumId: string | null;
+  isPrivate?: boolean;
 }
 
 export interface ScreenshotState {
   screenshots: Screenshot[];
   selectedScreenshots: string[];
   isLoading: boolean;
+  updateNote: (id: string, note: string) => void;
   error: string | null;
   loadScreenshots: () => Promise<void>;
   deleteScreenshot: (id: string) => void;

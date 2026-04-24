@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,8 +18,10 @@ import {BottomActionBar} from '../components/BottomActionBar';
 import {ScreenshotGrid} from '../components/ScreenshotGrid';
 import {useFilteredScreenshots} from '../hooks/useFilteredScreenshots';
 import {usePermissions} from '../hooks/usePermissions';
+import {trackEvent} from '../services/observability/analytics';
 import {useAlbumStore} from '../store/useAlbumStore';
 import {useFilterStore} from '../store/useFilterStore';
+import {useIntelligenceStore} from '../store/useIntelligenceStore';
 import {useScreenshotStore} from '../store/useScreenshotStore';
 import {useThemeStore} from '../store/useThemeStore';
 import type {HomeScreenProps, RootStackParamList, Screenshot} from '../types';
@@ -33,9 +36,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
   const deselectScreenshot = useScreenshotStore((state) => state.deselectScreenshot);
   const clearSelection = useScreenshotStore((state) => state.clearSelection);
   const deleteMultiple = useScreenshotStore((state) => state.deleteMultiple);
+  const deleteScreenshot = useScreenshotStore((state) => state.deleteScreenshot);
   const moveToAlbum = useScreenshotStore((state) => state.moveToAlbum);
+  const toggleFavorite = useScreenshotStore((state) => state.toggleFavorite);
+  const selectAll = useScreenshotStore((state) => state.selectAll);
   const isLoading = useScreenshotStore((state) => state.isLoading);
   const error = useScreenshotStore((state) => state.error);
+  const reindex = useIntelligenceStore((state) => state.reindex);
 
   const albums = useAlbumStore((state) => state.albums);
 
@@ -44,19 +51,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
 
   const {filteredScreenshots} = useFilteredScreenshots();
 
-  const {hasPhotoPermission, ensurePhotoPermission} = usePermissions();
+  const {isGranted, isLimited, ensurePhotoPermission} = usePermissions();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(true);
 
   const selectionMode = selectedScreenshots.length > 0;
+  const favoriteCount = useMemo(() => screenshots.filter((shot) => shot.isFavorite).length, [screenshots]);
 
   const handleInitialLoad = useCallback(async () => {
     const granted = await ensurePhotoPermission();
 
     if (granted) {
       await loadScreenshots();
+      trackEvent('home_load_screenshots', {granted});
     }
   }, [ensurePhotoPermission, loadScreenshots]);
+
+  useEffect(() => {
+    if (screenshots.length === 0) {
+      return;
+    }
+
+    reindex(screenshots);
+  }, [reindex, screenshots]);
 
   useEffect(() => {
     void handleInitialLoad();
@@ -156,6 +174,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
     }
   }, [clearSelection, selectedUris]);
 
+  const handleFavoriteSelected = useCallback(() => {
+    if (selectedScreenshots.length === 0) {
+      return;
+    }
+
+    selectedScreenshots.forEach((id) => {
+      toggleFavorite(id);
+    });
+
+    clearSelection();
+  }, [clearSelection, selectedScreenshots, toggleFavorite]);
+
+  const handleSelectAllVisible = useCallback(() => {
+    if (filteredScreenshots.length === screenshots.length) {
+      selectAll();
+      return;
+    }
+
+    clearSelection();
+    filteredScreenshots.forEach((shot) => {
+      selectScreenshot(shot.id);
+    });
+  }, [clearSelection, filteredScreenshots, screenshots.length, selectAll, selectScreenshot]);
+
   const onSearchSubmit = (event: NativeSyntheticEvent<TextInputSubmitEditingEventData>): void => {
     setSearchQuery(event.nativeEvent.text);
   };
@@ -170,6 +212,48 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
 
   return (
     <View style={[styles.container, {backgroundColor: theme.colors.background}]}> 
+      <View style={styles.heroWrap}>
+        <View>
+          <Text style={[styles.heroTitle, {color: theme.colors.text}]}>Screenshot Vault</Text>
+          <Text style={[styles.heroSubTitle, {color: theme.colors.muted}]}>Clean, search, and organize instantly</Text>
+        </View>
+        <Pressable
+          style={[styles.heroAction, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}
+          onPress={openSearchScreen}>
+          <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.text} />
+        </Pressable>
+      </View>
+
+      {showOnboarding ? (
+        <View style={[styles.onboardingCard, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
+          <View style={styles.onboardingRow}>
+            <MaterialCommunityIcons name="rocket-launch-outline" size={18} color={theme.colors.primary} />
+            <Text style={[styles.onboardingTitle, {color: theme.colors.text}]}>Get productive in 30 seconds</Text>
+            <Pressable onPress={() => setShowOnboarding(false)}>
+              <MaterialCommunityIcons name="close" size={18} color={theme.colors.muted} />
+            </Pressable>
+          </View>
+          <Text style={[styles.onboardingLine, {color: theme.colors.muted}]}>1. Long press to multi-select</Text>
+          <Text style={[styles.onboardingLine, {color: theme.colors.muted}]}>2. Use Search for OCR + smart categories</Text>
+          <Text style={[styles.onboardingLine, {color: theme.colors.muted}]}>3. Apply bulk actions from bottom panel</Text>
+        </View>
+      ) : null}
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsWrap}>
+        <View style={[styles.statChip, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
+          <Text style={[styles.statValue, {color: theme.colors.text}]}>{screenshots.length}</Text>
+          <Text style={[styles.statLabel, {color: theme.colors.muted}]}>Total shots</Text>
+        </View>
+        <View style={[styles.statChip, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
+          <Text style={[styles.statValue, {color: theme.colors.text}]}>{favoriteCount}</Text>
+          <Text style={[styles.statLabel, {color: theme.colors.muted}]}>Favorites</Text>
+        </View>
+        <View style={[styles.statChip, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
+          <Text style={[styles.statValue, {color: theme.colors.text}]}>{Math.max(albums.length - 1, 0)}</Text>
+          <Text style={[styles.statLabel, {color: theme.colors.muted}]}>Albums</Text>
+        </View>
+      </ScrollView>
+
       <View style={[styles.topBar, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
         <View
           style={[
@@ -193,7 +277,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
         </Pressable>
       </View>
 
-      {!hasPhotoPermission && !isLoading ? (
+      {!isGranted && !isLimited && !isLoading ? (
         <View style={styles.permissionBanner}>
           <Text style={[styles.permissionText, {color: theme.colors.text}]}>Gallery permission is required.</Text>
           <Pressable
@@ -218,6 +302,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
           handlePressItem(item);
         }}
         onLongPressItem={handleLongPressItem}
+        onDeleteItem={(item) => {
+          deleteScreenshot(item.id);
+        }}
+        onToggleFavoriteItem={(item) => {
+          toggleFavorite(item.id);
+        }}
         onRefresh={handleRefresh}
         onRetry={() => {
           void handleInitialLoad();
@@ -234,6 +324,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
         theme={theme}
         onDelete={handleDeleteSelected}
         onMoveToAlbum={handleMoveSelected}
+        onToggleFavorite={handleFavoriteSelected}
+        onSelectAll={handleSelectAllVisible}
+        onClearSelection={clearSelection}
         onShare={() => {
           void handleShareSelected();
         }}
@@ -260,6 +353,78 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    marginHorizontal: 12,
+    borderRadius: 14,
+    marginBottom: 6,
+  },
+  heroWrap: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  heroSubTitle: {
+    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  heroAction: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsWrap: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  onboardingCard: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 10,
+    gap: 4,
+  },
+  onboardingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  onboardingTitle: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  onboardingLine: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  statChip: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minWidth: 106,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  statLabel: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '500',
   },
   searchInputWrap: {
     flex: 1,

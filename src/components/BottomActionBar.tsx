@@ -1,11 +1,14 @@
-import React, {useEffect} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import React from 'react';
+import {StyleSheet, Text, Pressable, View} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
+  withSpring,
+  FadeInDown,
+  FadeOutDown,
 } from 'react-native-reanimated';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type {AppTheme} from '../types';
 
 interface BottomActionBarProps {
@@ -15,9 +18,35 @@ interface BottomActionBarProps {
   onDelete: () => void;
   onMoveToAlbum: () => void;
   onShare: () => void;
+  onToggleFavorite: () => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
 }
 
-const AnimatedView = Animated.createAnimatedComponent(View);
+interface ActionItemProps {
+  icon: string;
+  label: string;
+  color: string;
+  onPress: () => void;
+}
+
+const ActionItem: React.FC<ActionItemProps> = ({icon, label, color, onPress}) => {
+  const scale = useSharedValue(1);
+  const aStyle = useAnimatedStyle(() => ({transform: [{scale: scale.value}]}));
+
+  return (
+    <Animated.View style={aStyle}>
+      <Pressable
+        style={styles.actionItem}
+        onPress={onPress}
+        onPressIn={() => { scale.value = withSpring(0.88); }}
+        onPressOut={() => { scale.value = withSpring(1); }}>
+        <MaterialCommunityIcons name={icon} size={22} color={color} />
+        <Text style={[styles.actionItemLabel, {color}]}>{label}</Text>
+      </Pressable>
+    </Animated.View>
+  );
+};
 
 export const BottomActionBar: React.FC<BottomActionBarProps> = ({
   visible,
@@ -26,88 +55,92 @@ export const BottomActionBar: React.FC<BottomActionBarProps> = ({
   onDelete,
   onMoveToAlbum,
   onShare,
+  onToggleFavorite,
+  onSelectAll,
+  onClearSelection,
 }) => {
-  const translateY = useSharedValue(120);
-  const opacity = useSharedValue(0);
+  const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    translateY.value = withTiming(visible ? 0 : 120, {duration: 220});
-    opacity.value = withTiming(visible ? 1 : 0, {duration: 220});
-  }, [opacity, translateY, visible]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{translateY: translateY.value}],
-    opacity: opacity.value,
-  }));
+  if (!visible) return null;
 
   return (
-    <AnimatedView
-      pointerEvents={visible ? 'auto' : 'none'}
+    <Animated.View
+      entering={FadeInDown.springify().damping(16)}
+      exiting={FadeOutDown.duration(180)}
       style={[
-        styles.wrapper,
-        animatedStyle,
-        {backgroundColor: theme.colors.surface, borderColor: theme.colors.border},
+        styles.bar,
+        {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
+          paddingBottom: Math.max(insets.bottom, 12),
+        },
       ]}>
-      <Text style={[styles.label, {color: theme.colors.text}]}>{selectedCount} selected</Text>
 
-      <View style={styles.actions}>
-        <Pressable
-          style={[styles.actionButton, {backgroundColor: theme.colors.background}]}
-          onPress={onShare}>
-          <MaterialCommunityIcons name="share-variant" size={20} color={theme.colors.text} />
-          <Text style={[styles.actionText, {color: theme.colors.text}]}>Share</Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.actionButton, {backgroundColor: theme.colors.background}]}
-          onPress={onMoveToAlbum}>
-          <MaterialCommunityIcons name="folder-move" size={20} color={theme.colors.text} />
-          <Text style={[styles.actionText, {color: theme.colors.text}]}>Move</Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.actionButton, {backgroundColor: '#fbe4e4'}]}
-          onPress={onDelete}>
-          <MaterialCommunityIcons name="delete-outline" size={20} color={theme.colors.danger} />
-          <Text style={[styles.actionText, {color: theme.colors.danger}]}>Delete</Text>
-        </Pressable>
+      {/* Selection count pill + clear */}
+      <View style={styles.topRow}>
+        <View style={[styles.countPill, {backgroundColor: theme.colors.primary}]}>
+          <Text style={styles.countText}>{selectedCount} selected</Text>
+        </View>
+        <View style={styles.topRowRight}>
+          <Pressable onPress={onSelectAll} style={styles.topAction}>
+            <Text style={[styles.topActionText, {color: theme.colors.primary}]}>Select all</Text>
+          </Pressable>
+          <Pressable onPress={onClearSelection} style={styles.topAction}>
+            <MaterialCommunityIcons name="close" size={18} color={theme.colors.muted} />
+          </Pressable>
+        </View>
       </View>
-    </AnimatedView>
+
+      <View style={[styles.divider, {backgroundColor: theme.colors.border}]} />
+
+      {/* Actions */}
+      <View style={styles.actions}>
+        <ActionItem icon="share-variant-outline" label="Share" color={theme.colors.text} onPress={onShare} />
+        <ActionItem icon="folder-move-outline" label="Move" color={theme.colors.text} onPress={onMoveToAlbum} />
+        <ActionItem icon="heart-outline" label="Favorite" color={theme.colors.primary} onPress={onToggleFavorite} />
+        <ActionItem icon="delete-outline" label="Delete" color={theme.colors.danger} onPress={onDelete} />
+      </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  wrapper: {
+  bar: {
     position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 18,
-    borderRadius: 16,
-    borderWidth: 1,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: {width: 0, height: -4},
+    elevation: 12,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 10,
-    gap: 10,
+    marginBottom: 8,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '700',
+  countPill: {
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
+  countText: {color: '#fff', fontSize: 12, fontWeight: '700'},
+  topRowRight: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  topAction: {paddingHorizontal: 4},
+  topActionText: {fontSize: 13, fontWeight: '600'},
+  divider: {height: 1, marginHorizontal: 14, marginBottom: 8},
   actions: {
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-around',
+    paddingHorizontal: 8,
+    paddingTop: 2,
   },
-  actionButton: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 5,
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  actionItem: {alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 6},
+  actionItemLabel: {fontSize: 11, fontWeight: '600'},
 });

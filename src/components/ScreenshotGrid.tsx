@@ -32,6 +32,8 @@ interface ScreenshotGridProps {
   theme: AppTheme;
   onPressItem: (item: Screenshot, index: number) => void;
   onLongPressItem: (item: Screenshot) => void;
+  onDeleteItem?: (item: Screenshot) => void;
+  onToggleFavoriteItem?: (item: Screenshot) => void;
   onRefresh: () => void;
   onRetry: () => void;
   emptyTitle: string;
@@ -77,6 +79,8 @@ export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({
   theme,
   onPressItem,
   onLongPressItem,
+  onDeleteItem,
+  onToggleFavoriteItem,
   onRefresh,
   onRetry,
   emptyTitle,
@@ -108,6 +112,8 @@ export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({
         theme={theme}
         onPress={() => onPressItem(item, index)}
         onLongPress={() => onLongPressItem(item)}
+        onDelete={onDeleteItem ? () => onDeleteItem(item) : undefined}
+        onToggleFavorite={onToggleFavoriteItem ? () => onToggleFavoriteItem(item) : undefined}
       />
     </View>
   );
