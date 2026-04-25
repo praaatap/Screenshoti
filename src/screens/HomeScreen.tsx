@@ -1,8 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +10,11 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Share from 'react-native-share';
 import {BottomActionBar} from '../components/BottomActionBar';
@@ -24,11 +27,16 @@ import {useFilterStore} from '../store/useFilterStore';
 import {useIntelligenceStore} from '../store/useIntelligenceStore';
 import {useScreenshotStore} from '../store/useScreenshotStore';
 import {useThemeStore} from '../store/useThemeStore';
+import {useToastStore} from '../store/useToastStore';
+import {ConfirmationSheet} from '../components/ui/ConfirmationSheet';
+import {designTokens} from '../theme/tokens';
 import type {HomeScreenProps, RootStackParamList, Screenshot} from '../types';
 
 export const HomeScreen: React.FC<HomeScreenProps> = () => {
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const theme = useThemeStore((state) => state.theme);
+  const fabScale = useSharedValue(1);
+  const fabStyle = useAnimatedStyle(() => ({transform: [{scale: fabScale.value}]}));
   const loadScreenshots = useScreenshotStore((state) => state.loadScreenshots);
   const screenshots = useScreenshotStore((state) => state.screenshots);
   const selectedScreenshots = useScreenshotStore((state) => state.selectedScreenshots);
@@ -52,9 +60,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
   const {filteredScreenshots} = useFilteredScreenshots();
 
   const {isGranted, isLimited, ensurePhotoPermission} = usePermissions();
+  const showToast = useToastStore((state) => state.show);
 
   const [refreshing, setRefreshing] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showDeleteSheet, setShowDeleteSheet] = useState(false);
 
   const selectionMode = selectedScreenshots.length > 0;
   const favoriteCount = useMemo(() => screenshots.filter((shot) => shot.isFavorite).length, [screenshots]);
@@ -129,19 +138,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
     if (selectedScreenshots.length === 0) {
       return;
     }
+    setShowDeleteSheet(true);
+  }, [selectedScreenshots]);
 
-    Alert.alert('Delete selected', `Delete ${selectedScreenshots.length} screenshot(s)?`, [
-      {text: 'Cancel', style: 'cancel'},
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          deleteMultiple(selectedScreenshots);
-          clearSelection();
-        },
-      },
-    ]);
-  }, [clearSelection, deleteMultiple, selectedScreenshots]);
+  const confirmDeleteSelected = useCallback(() => {
+    deleteMultiple(selectedScreenshots);
+    clearSelection();
+    showToast(`Deleted ${selectedScreenshots.length} screenshot(s).`, 'success');
+  }, [clearSelection, deleteMultiple, selectedScreenshots, showToast]);
 
   const handleMoveSelected = useCallback(() => {
     if (selectedScreenshots.length === 0) {
@@ -151,14 +155,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
     const targetAlbum = albums.find((album) => album.id !== 'all-screenshots');
 
     if (!targetAlbum) {
-      Alert.alert('Create album first', 'Please create an album from the Albums tab before moving items.');
+      showToast('Create an album from the Albums tab first.', 'warning');
       return;
     }
 
     moveToAlbum(selectedScreenshots, targetAlbum.id);
     clearSelection();
 
-    Alert.alert('Moved', `Moved ${selectedScreenshots.length} screenshot(s) to ${targetAlbum.name}.`);
+    showToast(`Moved ${selectedScreenshots.length} screenshot(s) to ${targetAlbum.name}.`, 'success');
   }, [albums, clearSelection, moveToAlbum, selectedScreenshots]);
 
   const handleShareSelected = useCallback(async () => {
@@ -211,81 +215,55 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
   };
 
   return (
-    <View style={[styles.container, {backgroundColor: theme.colors.background}]}> 
-      <View style={styles.heroWrap}>
-        <View>
-          <Text style={[styles.heroTitle, {color: theme.colors.text}]}>Screenshot Vault</Text>
-          <Text style={[styles.heroSubTitle, {color: theme.colors.muted}]}>Clean, search, and organize instantly</Text>
+    <View style={[styles.container, {backgroundColor: theme.colors.background}]}>
+      {/* Compact header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={[designTokens.typography.titleLarge, {color: theme.colors.text}]}>Screenshoti</Text>
+          <Text style={[designTokens.typography.bodySmall, {color: theme.colors.muted}]}>
+            {screenshots.length} shots{favoriteCount > 0 ? ` · ${favoriteCount} faves` : ''}{albums.length > 1 ? ` · ${albums.length - 1} albums` : ''}
+          </Text>
         </View>
         <Pressable
-          style={[styles.heroAction, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}
+          style={[styles.headerIconButton, {backgroundColor: theme.colors.surfaceVariant}]}
           onPress={openSearchScreen}>
-          <MaterialCommunityIcons name="magnify" size={18} color={theme.colors.text} />
+          <MaterialCommunityIcons name="magnify" size={designTokens.iconSize.md} color={theme.colors.text} />
         </Pressable>
       </View>
 
-      {showOnboarding ? (
-        <View style={[styles.onboardingCard, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
-          <View style={styles.onboardingRow}>
-            <MaterialCommunityIcons name="rocket-launch-outline" size={18} color={theme.colors.primary} />
-            <Text style={[styles.onboardingTitle, {color: theme.colors.text}]}>Get productive in 30 seconds</Text>
-            <Pressable onPress={() => setShowOnboarding(false)}>
-              <MaterialCommunityIcons name="close" size={18} color={theme.colors.muted} />
-            </Pressable>
-          </View>
-          <Text style={[styles.onboardingLine, {color: theme.colors.muted}]}>1. Long press to multi-select</Text>
-          <Text style={[styles.onboardingLine, {color: theme.colors.muted}]}>2. Use Search for OCR + smart categories</Text>
-          <Text style={[styles.onboardingLine, {color: theme.colors.muted}]}>3. Apply bulk actions from bottom panel</Text>
-        </View>
-      ) : null}
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsWrap}>
-        <View style={[styles.statChip, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
-          <Text style={[styles.statValue, {color: theme.colors.text}]}>{screenshots.length}</Text>
-          <Text style={[styles.statLabel, {color: theme.colors.muted}]}>Total shots</Text>
-        </View>
-        <View style={[styles.statChip, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
-          <Text style={[styles.statValue, {color: theme.colors.text}]}>{favoriteCount}</Text>
-          <Text style={[styles.statLabel, {color: theme.colors.muted}]}>Favorites</Text>
-        </View>
-        <View style={[styles.statChip, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
-          <Text style={[styles.statValue, {color: theme.colors.text}]}>{Math.max(albums.length - 1, 0)}</Text>
-          <Text style={[styles.statLabel, {color: theme.colors.muted}]}>Albums</Text>
-        </View>
-      </ScrollView>
-
-      <View style={[styles.topBar, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}> 
+      {/* Inline search bar */}
+      <View style={styles.searchBar}>
         <View
           style={[
             styles.searchInputWrap,
-            {backgroundColor: theme.colors.background, borderColor: theme.colors.border},
+            designTokens.elevation.low,
+            {backgroundColor: theme.colors.surface},
           ]}>
-          <MaterialCommunityIcons name="magnify" size={19} color={theme.colors.muted} />
+          <MaterialCommunityIcons name="magnify" size={designTokens.iconSize.sm} color={theme.colors.muted} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             onSubmitEditing={onSearchSubmit}
-            placeholder="Search screenshots"
+            placeholder="Search screenshots..."
             placeholderTextColor={theme.colors.muted}
-            style={[styles.searchInput, {color: theme.colors.text}]}
+            style={[designTokens.typography.bodyMedium, styles.searchInput, {color: theme.colors.text}]}
             returnKeyType="search"
           />
+          <Pressable onPress={openSearchScreen} hitSlop={8}>
+            <MaterialCommunityIcons name="tune-variant" size={designTokens.iconSize.sm} color={theme.colors.muted} />
+          </Pressable>
         </View>
-
-        <Pressable style={styles.filterButton} onPress={openSearchScreen}>
-          <MaterialCommunityIcons name="tune-variant" size={20} color={theme.colors.text} />
-        </Pressable>
       </View>
 
       {!isGranted && !isLimited && !isLoading ? (
         <View style={styles.permissionBanner}>
-          <Text style={[styles.permissionText, {color: theme.colors.text}]}>Gallery permission is required.</Text>
+          <Text style={[designTokens.typography.bodySmall, {color: theme.colors.text}]}>Gallery permission is required.</Text>
           <Pressable
             style={[styles.permissionButton, {backgroundColor: theme.colors.primary}]}
             onPress={() => {
               void handleInitialLoad();
             }}>
-            <Text style={styles.permissionButtonText}>Grant access</Text>
+            <Text style={[designTokens.typography.labelMedium, {color: '#ffffff'}]}>Grant access</Text>
           </Pressable>
         </View>
       ) : null}
@@ -312,8 +290,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
         onRetry={() => {
           void handleInitialLoad();
         }}
-        emptyTitle="No screenshots yet"
-        emptyDescription="Import screenshots from your gallery to keep them organized in one place."
+        emptyTitle="Your gallery is waiting"
+        emptyDescription="Import screenshots from your gallery to organize, search, and tag them."
         emptyActionLabel="Import now"
         onEmptyActionPress={handleFabImport}
       />
@@ -332,12 +310,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
         }}
       />
 
-      <Pressable
-        style={[styles.fab, {backgroundColor: theme.colors.primary}]}
-        onPress={handleFabImport}
-        accessibilityRole="button">
-        <MaterialCommunityIcons name="import" size={24} color="#ffffff" />
-      </Pressable>
+      <Animated.View style={[styles.fab, {backgroundColor: theme.colors.primary}, designTokens.elevation.medium, fabStyle]}>
+        <Pressable
+          style={styles.fabInner}
+          onPress={handleFabImport}
+          onPressIn={() => { fabScale.value = withSpring(0.88, {damping: 15}); }}
+          onPressOut={() => { fabScale.value = withSpring(1, {damping: 12}); }}
+          accessibilityRole="button"
+          accessibilityLabel="Import screenshots from gallery">
+          <MaterialCommunityIcons name="import" size={designTokens.iconSize.md} color="#ffffff" />
+        </Pressable>
+      </Animated.View>
+
+      <ConfirmationSheet
+        visible={showDeleteSheet}
+        onClose={() => setShowDeleteSheet(false)}
+        onConfirm={confirmDeleteSelected}
+        theme={theme}
+        title="Delete selected"
+        description={`Delete ${selectedScreenshots.length} screenshot(s)? This can't be undone.`}
+        confirmLabel="Delete"
+        icon="delete-outline"
+      />
     </View>
   );
 };
@@ -346,141 +340,65 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  topBar: {
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginHorizontal: 12,
-    borderRadius: 14,
-    marginBottom: 6,
-  },
-  heroWrap: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
+  header: {
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingTop: designTokens.spacing.sm,
+    paddingBottom: designTokens.spacing.xs,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  heroTitle: {
-    fontSize: 24,
-    fontWeight: '800',
+  headerLeft: {
+    flex: 1,
+    gap: designTokens.spacing.xxs,
   },
-  heroSubTitle: {
-    marginTop: 2,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  heroAction: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1,
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: designTokens.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statsWrap: {
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-    gap: 8,
-  },
-  onboardingCard: {
-    marginHorizontal: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 10,
-    gap: 4,
-  },
-  onboardingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  onboardingTitle: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  onboardingLine: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  statChip: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minWidth: 106,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  statLabel: {
-    marginTop: 2,
-    fontSize: 12,
-    fontWeight: '500',
+  searchBar: {
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingVertical: designTokens.spacing.sm,
   },
   searchInputWrap: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: designTokens.radius.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    height: 42,
+    gap: designTokens.spacing.sm,
+    paddingHorizontal: designTokens.spacing.md,
+    height: 44,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
-  },
-  filterButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   fab: {
     position: 'absolute',
-    right: 18,
-    bottom: 28,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    right: designTokens.spacing.xl,
+    bottom: designTokens.spacing.xxxl,
+    width: 56,
+    height: 56,
+    borderRadius: designTokens.radius.full,
+    overflow: 'hidden',
+  },
+  fabInner: {
+    width: 56,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 5,
   },
   permissionBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  permissionText: {
-    fontSize: 13,
-    fontWeight: '500',
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingVertical: designTokens.spacing.sm,
   },
   permissionButton: {
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  permissionButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
+    borderRadius: designTokens.radius.sm,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.sm,
   },
 });

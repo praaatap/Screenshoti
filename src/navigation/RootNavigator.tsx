@@ -1,15 +1,17 @@
 import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { NavigationContainer, DefaultTheme, DarkTheme, type Theme } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import {Platform, Pressable, View} from 'react-native';
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {NavigationContainer, DefaultTheme, DarkTheme, type Theme} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { DetailScreen } from '../screens/DetailScreen';
-import { HomeScreen } from '../features/home/screens';
-import { AlbumsScreen, AlbumDetailScreen } from '../features/albums/screens';
-import { FavoritesScreen } from '../features/favorites/screens';
-import { SearchScreen } from '../features/search/screens';
-import { SettingsScreen } from '../features/settings/screens';
-import { useThemeStore } from '../store/useThemeStore';
+import {designTokens} from '../theme/tokens';
+import {DetailScreen} from '../screens/DetailScreen';
+import {HomeScreen} from '../features/home/screens';
+import {AlbumsScreen, AlbumDetailScreen} from '../features/albums/screens';
+import {FavoritesScreen} from '../features/favorites/screens';
+import {SearchScreen} from '../features/search/screens';
+import {SettingsScreen} from '../features/settings/screens';
+import {useThemeStore} from '../store/useThemeStore';
 import type {
   AlbumsStackParamList,
   BottomTabParamList,
@@ -18,9 +20,9 @@ import type {
   RootStackParamList,
   SettingsStackParamList,
 } from '../types';
-import { useScreenshotStore } from '../store/useScreenshotStore';
+import {useScreenshotStore} from '../store/useScreenshotStore';
 
-interface EmptyProps { }
+interface EmptyProps {}
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const BottomTabs = createBottomTabNavigator<BottomTabParamList>();
@@ -29,17 +31,19 @@ const AlbumsStack = createNativeStackNavigator<AlbumsStackParamList>();
 const FavoritesStack = createNativeStackNavigator<FavoritesStackParamList>();
 const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
+const sharedHeaderOptions = (theme: ReturnType<typeof useThemeStore.getState>['theme']) => ({
+  headerStyle: {backgroundColor: theme.colors.background},
+  headerShadowVisible: false,
+  headerTintColor: theme.colors.text,
+  headerTitleStyle: designTokens.typography.titleLarge,
+} as const);
+
 const HomeStackNavigator: React.FC<EmptyProps> = () => {
   const theme = useThemeStore((state) => state.theme);
 
   return (
-    <HomeStack.Navigator
-      screenOptions={{
-        headerStyle: {backgroundColor: theme.colors.background},
-        headerShadowVisible: false,
-        headerTintColor: theme.colors.text,
-      }}>
-      <HomeStack.Screen name="Home" component={HomeScreen} options={{ title: 'Screenshots' }} />
+    <HomeStack.Navigator screenOptions={sharedHeaderOptions(theme)}>
+      <HomeStack.Screen name="Home" component={HomeScreen} options={{headerShown: false}} />
     </HomeStack.Navigator>
   );
 };
@@ -48,12 +52,7 @@ const AlbumsStackNavigator: React.FC<EmptyProps> = () => {
   const theme = useThemeStore((state) => state.theme);
 
   return (
-    <AlbumsStack.Navigator
-      screenOptions={{
-        headerStyle: {backgroundColor: theme.colors.background},
-        headerShadowVisible: false,
-        headerTintColor: theme.colors.text,
-      }}>
+    <AlbumsStack.Navigator screenOptions={sharedHeaderOptions(theme)}>
       <AlbumsStack.Screen name="Albums" component={AlbumsScreen} />
     </AlbumsStack.Navigator>
   );
@@ -63,12 +62,7 @@ const FavoritesStackNavigator: React.FC<EmptyProps> = () => {
   const theme = useThemeStore((state) => state.theme);
 
   return (
-    <FavoritesStack.Navigator
-      screenOptions={{
-        headerStyle: {backgroundColor: theme.colors.background},
-        headerShadowVisible: false,
-        headerTintColor: theme.colors.text,
-      }}>
+    <FavoritesStack.Navigator screenOptions={sharedHeaderOptions(theme)}>
       <FavoritesStack.Screen name="Favorites" component={FavoritesScreen} />
     </FavoritesStack.Navigator>
   );
@@ -78,12 +72,7 @@ const SettingsStackNavigator: React.FC<EmptyProps> = () => {
   const theme = useThemeStore((state) => state.theme);
 
   return (
-    <SettingsStack.Navigator
-      screenOptions={{
-        headerStyle: {backgroundColor: theme.colors.background},
-        headerShadowVisible: false,
-        headerTintColor: theme.colors.text,
-      }}>
+    <SettingsStack.Navigator screenOptions={sharedHeaderOptions(theme)}>
       <SettingsStack.Screen name="Settings" component={SettingsScreen} />
     </SettingsStack.Navigator>
   );
@@ -98,7 +87,7 @@ const MainTabsNavigator: React.FC<EmptyProps> = () => {
 
   return (
     <BottomTabs.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={({route}) => ({
         headerShown: false,
         tabBarShowLabel: true,
         tabBarHideOnKeyboard: true,
@@ -106,17 +95,18 @@ const MainTabsNavigator: React.FC<EmptyProps> = () => {
         tabBarInactiveTintColor: theme.colors.muted,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
-          borderTopWidth: 1,
-          height: 66,
-          paddingBottom: 8,
-          paddingTop: 7,
+          borderTopWidth: 0,
+          height: 72,
+          paddingBottom: 12,
+          paddingTop: 8,
+          ...designTokens.elevation.medium,
+          ...(Platform.OS === 'ios' ? {shadowOffset: {width: 0, height: -3}} : {}),
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
+          ...designTokens.typography.labelSmall,
+          marginTop: 2,
         },
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({color, focused}) => {
           const iconMap: Record<keyof BottomTabParamList, string> = {
             HomeTab: 'image-multiple',
             AlbumsTab: 'folder-multiple-image',
@@ -124,22 +114,35 @@ const MainTabsNavigator: React.FC<EmptyProps> = () => {
             SettingsTab: 'cog',
           };
 
-          return <MaterialCommunityIcons name={iconMap[route.name]} size={size} color={color} />;
+          return (
+            <View style={{alignItems: 'center'}}>
+              <MaterialCommunityIcons name={iconMap[route.name]} size={designTokens.iconSize.md} color={color} />
+              {focused && (
+                <View style={{
+                  width: 24,
+                  height: 3,
+                  borderRadius: 1.5,
+                  backgroundColor: theme.colors.primary,
+                  marginTop: 3,
+                }} />
+              )}
+            </View>
+          );
         },
       })}>
-      <BottomTabs.Screen name="HomeTab" component={HomeStackNavigator} options={{ title: 'Home' }} />
-      <BottomTabs.Screen name="AlbumsTab" component={AlbumsStackNavigator} options={{ title: 'Albums' }} />
+      <BottomTabs.Screen name="HomeTab" component={HomeStackNavigator} options={{title: 'Home', tabBarAccessibilityLabel: 'Home tab, view all screenshots'}} />
+      <BottomTabs.Screen name="AlbumsTab" component={AlbumsStackNavigator} options={{title: 'Albums', tabBarAccessibilityLabel: 'Albums tab, organize screenshots'}} />
       <BottomTabs.Screen
         name="FavoritesTab"
         component={FavoritesStackNavigator}
         options={{
           title: 'Favorites',
+          tabBarAccessibilityLabel: `Favorites tab${favoriteCount > 0 ? `, ${favoriteCount} items` : ''}`,
           tabBarBadge: favoriteCount > 0 ? favoriteCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: theme.colors.primary, fontSize: 10 },
+          tabBarBadgeStyle: {backgroundColor: theme.colors.primary, fontSize: 10},
         }}
       />
-
-      <BottomTabs.Screen name="SettingsTab" component={SettingsStackNavigator} options={{ title: 'Settings' }} />
+      <BottomTabs.Screen name="SettingsTab" component={SettingsStackNavigator} options={{title: 'Settings', tabBarAccessibilityLabel: 'Settings tab, app preferences'}} />
     </BottomTabs.Navigator>
   );
 };
@@ -162,15 +165,42 @@ export const RootNavigator: React.FC<EmptyProps> = () => {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      <RootStack.Navigator>
-        <RootStack.Screen name="Main" component={MainTabsNavigator} options={{ headerShown: false }} />
-        <RootStack.Screen name="Detail" component={DetailScreen} options={{ title: 'Screenshot details' }} />
+      <RootStack.Navigator
+        screenOptions={{
+          ...sharedHeaderOptions(appTheme),
+        }}>
+        <RootStack.Screen name="Main" component={MainTabsNavigator} options={{headerShown: false}} />
+        <RootStack.Screen
+          name="Detail"
+          component={DetailScreen}
+          options={() => ({
+            title: 'Details',
+            animation: 'fade_from_bottom',
+            animationDuration: 250,
+            headerRight: () => (
+              <Pressable
+                onPress={() => {}}
+                style={{padding: designTokens.spacing.xs}}
+                accessibilityLabel="Share screenshot">
+                <MaterialCommunityIcons name="share-variant-outline" size={designTokens.iconSize.md} color={appTheme.colors.text} />
+              </Pressable>
+            ),
+          })}
+        />
         <RootStack.Screen
           name="AlbumDetail"
           component={AlbumDetailScreen}
-          options={({ route }) => ({ title: route.params.albumName })}
+          options={({route}) => ({title: route.params.albumName})}
         />
-        <RootStack.Screen name="Search" component={SearchScreen} options={{ headerShown: false }} />
+        <RootStack.Screen
+          name="Search"
+          component={SearchScreen}
+          options={{
+            headerShown: false,
+            animation: 'slide_from_bottom',
+            animationDuration: 300,
+          }}
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );

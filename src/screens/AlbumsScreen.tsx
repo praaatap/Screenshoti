@@ -2,9 +2,8 @@ import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {
-  Alert,
   FlatList,
-  Modal,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -22,6 +21,10 @@ import {useShallow} from 'zustand/react/shallow';
 import {useAlbumStore} from '../store/useAlbumStore';
 import {useScreenshotStore} from '../store/useScreenshotStore';
 import {useThemeStore} from '../store/useThemeStore';
+import {useToastStore} from '../store/useToastStore';
+import {BottomSheet} from '../components/ui/BottomSheet';
+import {ConfirmationSheet} from '../components/ui/ConfirmationSheet';
+import {designTokens} from '../theme/tokens';
 import type {Album, AlbumsScreenProps, RootStackParamList} from '../types';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -61,24 +64,34 @@ const AlbumCard: React.FC<AlbumCardProps> = ({item, theme, onPress, onLongPress}
   return (
     <Animated.View style={[styles.albumCardWrapper, animatedStyle]}>
       <Pressable
-        style={[styles.albumCard, {backgroundColor: theme.colors.surface, borderColor: theme.colors.border}]}
+        style={[styles.albumCard, designTokens.elevation.low, {backgroundColor: theme.colors.surface}]}
         onPress={onPress}
         onLongPress={onLongPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        android_ripple={{color: `${item.accentColor}22`}}>
-
-        {/* Color accent strip */}
-        <View style={[styles.accentStrip, {backgroundColor: item.accentColor}]} />
+        android_ripple={{color: `${item.accentColor}22`}}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name} album, ${item.computedCount} screenshots`}
+        accessibilityHint="Tap to open, long press for options">
 
         <View style={styles.albumCardBody}>
-          {/* Cover area */}
-          <View style={[styles.cover, {backgroundColor: `${item.accentColor}18`}]}>
-            <MaterialCommunityIcons
-              name={item.computedCoverUri ? 'image-multiple-outline' : 'folder-image'}
-              size={32}
-              color={item.accentColor}
-            />
+          {/* Cover area - show actual thumbnail */}
+          <View style={[styles.cover, {backgroundColor: `${item.accentColor}12`}]}>
+            {item.computedCoverUri ? (
+              <Image
+                source={{uri: item.computedCoverUri}}
+                style={styles.coverImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.coverPlaceholder}>
+                <MaterialCommunityIcons
+                  name="folder-image"
+                  size={designTokens.iconSize.xl}
+                  color={item.accentColor}
+                />
+              </View>
+            )}
             {item.computedCount > 0 && (
               <View style={[styles.countBadge, {backgroundColor: item.accentColor}]}>
                 <Text style={styles.countBadgeText}>{item.computedCount}</Text>
@@ -86,12 +99,15 @@ const AlbumCard: React.FC<AlbumCardProps> = ({item, theme, onPress, onLongPress}
             )}
           </View>
 
-          <Text numberOfLines={1} style={[styles.albumName, {color: theme.colors.text}]}>
-            {item.name}
-          </Text>
-          <Text style={[styles.albumCount, {color: theme.colors.muted}]}>
-            {item.computedCount === 1 ? '1 screenshot' : `${item.computedCount} screenshots`}
-          </Text>
+          {/* Text overlay area */}
+          <View style={styles.albumTextArea}>
+            <Text numberOfLines={1} style={[designTokens.typography.titleMedium, {color: theme.colors.text}]}>
+              {item.name}
+            </Text>
+            <Text style={[designTokens.typography.bodySmall, {color: theme.colors.muted}]}>
+              {item.computedCount === 1 ? '1 screenshot' : `${item.computedCount} screenshots`}
+            </Text>
+          </View>
         </View>
       </Pressable>
     </Animated.View>
@@ -114,11 +130,13 @@ export const AlbumsScreen: React.FC<AlbumsScreenProps> = () => {
   );
 
   const screenshots = useScreenshotStore((state) => state.screenshots);
+  const showToast = useToastStore((state) => state.show);
 
   const [createValue, setCreateValue] = useState('');
   const [activeAlbum, setActiveAlbum] = useState<AlbumWithComputedFields | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('date');
+  const [showDeleteSheet, setShowDeleteSheet] = useState(false);
   const createInputRef = useRef<TextInput>(null);
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -188,22 +206,15 @@ export const AlbumsScreen: React.FC<AlbumsScreenProps> = () => {
 
   const confirmDelete = useCallback((): void => {
     if (!activeAlbum) return;
-    Alert.alert(
-      'Delete album',
-      `Delete "${activeAlbum.name}"? Screenshots inside won't be deleted.`,
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteAlbum(activeAlbum.id);
-            closeModal();
-          },
-        },
-      ],
-    );
-  }, [activeAlbum, closeModal, deleteAlbum]);
+    setShowDeleteSheet(true);
+  }, [activeAlbum]);
+
+  const executeDelete = useCallback((): void => {
+    if (!activeAlbum) return;
+    deleteAlbum(activeAlbum.id);
+    showToast(`Album "${activeAlbum.name}" deleted.`, 'success');
+    closeModal();
+  }, [activeAlbum, closeModal, deleteAlbum, showToast]);
 
   const cycleSortMode = useCallback((): void => {
     setSortMode((prev) => {
@@ -286,80 +297,71 @@ export const AlbumsScreen: React.FC<AlbumsScreenProps> = () => {
       />
 
       {/* Album options bottom sheet */}
-      <Modal
-        visible={activeAlbum !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={closeModal}>
-        <Pressable style={styles.modalBackdrop} onPress={closeModal}>
+      <BottomSheet visible={activeAlbum !== null} onClose={closeModal} theme={theme}>
+        <Text style={[styles.modalTitle, {color: theme.colors.text}]}>
+          {activeAlbum?.name}
+        </Text>
+
+        <Text style={[styles.modalSubtitle, {color: theme.colors.muted}]}>
+          {activeAlbum?.computedCount ?? 0} screenshots
+        </Text>
+
+        <TextInput
+          value={renameValue}
+          onChangeText={setRenameValue}
+          style={[
+            styles.renameInput,
+            {
+              color: theme.colors.text,
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.background,
+            },
+          ]}
+          placeholder="Rename album"
+          placeholderTextColor={theme.colors.muted}
+          onSubmitEditing={saveRename}
+          returnKeyType="done"
+        />
+
+        <View style={styles.modalActions}>
           <Pressable
-            style={[styles.modalCard, {backgroundColor: theme.colors.surface}]}
-            onPress={() => {/* stop propagation */}}>
-
-            {/* Handle */}
-            <View style={[styles.modalHandle, {backgroundColor: theme.colors.border}]} />
-
-            <Text style={[styles.modalTitle, {color: theme.colors.text}]}>
-              {activeAlbum?.name}
-            </Text>
-
-            {/* NEW: Show screenshot count in modal */}
-            <Text style={[styles.modalSubtitle, {color: theme.colors.muted}]}>
-              {activeAlbum?.computedCount ?? 0} screenshots
-            </Text>
-
-            <TextInput
-              value={renameValue}
-              onChangeText={setRenameValue}
-              style={[
-                styles.renameInput,
-                {
-                  color: theme.colors.text,
-                  borderColor: theme.colors.border,
-                  backgroundColor: theme.colors.background,
-                },
-              ]}
-              placeholder="Rename album"
-              placeholderTextColor={theme.colors.muted}
-              onSubmitEditing={saveRename}
-              returnKeyType="done"
-            />
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.modalButton, {backgroundColor: theme.colors.background, borderColor: theme.colors.border}]}
-                onPress={saveRename}>
-                <MaterialCommunityIcons name="pencil" size={16} color={theme.colors.primary} />
-                <Text style={[styles.modalButtonLabel, {color: theme.colors.primary}]}>Rename</Text>
-              </Pressable>
-
-              {/* NEW: Navigate to album directly from modal */}
-              <Pressable
-                style={[styles.modalButton, {backgroundColor: theme.colors.background, borderColor: theme.colors.border}]}
-                onPress={() => {
-                  closeModal();
-                  if (activeAlbum) handleNavigate(activeAlbum);
-                }}>
-                <MaterialCommunityIcons name="open-in-app" size={16} color={theme.colors.text} />
-                <Text style={[styles.modalButtonLabel, {color: theme.colors.text}]}>Open</Text>
-              </Pressable>
-
-              {activeAlbum?.id !== 'all-screenshots' && (
-                <Pressable
-                  style={[styles.modalButton, {backgroundColor: '#fef2f2', borderColor: '#fecaca'}]}
-                  onPress={confirmDelete}>
-                  <MaterialCommunityIcons name="delete-outline" size={16} color={theme.colors.danger} />
-                  <Text style={[styles.modalButtonLabel, {color: theme.colors.danger}]}>Delete</Text>
-                </Pressable>
-              )}
-            </View>
-
-            <Pressable style={styles.cancelAction} onPress={closeModal}>
-              <Text style={[styles.cancelText, {color: theme.colors.muted}]}>Cancel</Text>
-            </Pressable>
+            style={[styles.modalButton, {backgroundColor: theme.colors.background, borderColor: theme.colors.border}]}
+            onPress={saveRename}>
+            <MaterialCommunityIcons name="pencil" size={16} color={theme.colors.primary} />
+            <Text style={[styles.modalButtonLabel, {color: theme.colors.primary}]}>Rename</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+
+          <Pressable
+            style={[styles.modalButton, {backgroundColor: theme.colors.background, borderColor: theme.colors.border}]}
+            onPress={() => {
+              closeModal();
+              if (activeAlbum) {handleNavigate(activeAlbum);}
+            }}>
+            <MaterialCommunityIcons name="open-in-app" size={16} color={theme.colors.text} />
+            <Text style={[styles.modalButtonLabel, {color: theme.colors.text}]}>Open</Text>
+          </Pressable>
+
+          {activeAlbum?.id !== 'all-screenshots' && (
+            <Pressable
+              style={[styles.modalButton, {backgroundColor: theme.colors.dangerContainer, borderColor: theme.colors.danger}]}
+              onPress={confirmDelete}>
+              <MaterialCommunityIcons name="delete-outline" size={16} color={theme.colors.danger} />
+              <Text style={[styles.modalButtonLabel, {color: theme.colors.danger}]}>Delete</Text>
+            </Pressable>
+          )}
+        </View>
+      </BottomSheet>
+
+      <ConfirmationSheet
+        visible={showDeleteSheet}
+        onClose={() => setShowDeleteSheet(false)}
+        onConfirm={executeDelete}
+        theme={theme}
+        title="Delete album"
+        description={`Delete "${activeAlbum?.name}"? Screenshots inside won't be deleted.`}
+        confirmLabel="Delete"
+        icon="folder-remove-outline"
+      />
     </View>
   );
 };
@@ -367,98 +369,98 @@ export const AlbumsScreen: React.FC<AlbumsScreenProps> = () => {
 const styles = StyleSheet.create({
   container: {flex: 1},
   createWrap: {
-    marginHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    marginHorizontal: designTokens.spacing.lg,
+    marginTop: designTokens.spacing.md,
+    marginBottom: designTokens.spacing.xs,
+    borderRadius: designTokens.radius.lg,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingVertical: designTokens.spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: designTokens.spacing.sm,
+    ...designTokens.elevation.low,
   },
-  createInput: {flex: 1, fontSize: 14, paddingHorizontal: 4},
+  createInput: {flex: 1, ...designTokens.typography.bodyMedium, paddingHorizontal: designTokens.spacing.xs},
   createButton: {
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    borderRadius: designTokens.radius.sm,
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingVertical: designTokens.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  createButtonLabel: {color: '#ffffff', fontSize: 13, fontWeight: '700'},
+  createButtonLabel: {color: '#ffffff', ...designTokens.typography.labelLarge},
   sortBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingVertical: designTokens.spacing.sm,
   },
-  sortLabel: {fontSize: 12, fontWeight: '500'},
-  sortButton: {flexDirection: 'row', alignItems: 'center', gap: 4},
-  sortButtonText: {fontSize: 12, fontWeight: '700'},
-  listContent: {paddingHorizontal: 12, paddingBottom: 24, gap: 12},
-  columnWrap: {gap: 12},
+  sortLabel: designTokens.typography.bodySmall,
+  sortButton: {flexDirection: 'row', alignItems: 'center', gap: designTokens.spacing.xs},
+  sortButtonText: designTokens.typography.labelMedium,
+  listContent: {paddingHorizontal: designTokens.spacing.lg, paddingBottom: designTokens.spacing.xxxl, gap: designTokens.spacing.md},
+  columnWrap: {gap: designTokens.spacing.md},
   albumCardWrapper: {flex: 1},
   albumCard: {
     flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: designTokens.radius.lg,
     overflow: 'hidden',
   },
-  accentStrip: {height: 4, width: '100%'},
-  albumCardBody: {padding: 10, gap: 6},
+  albumCardBody: {gap: 0},
   cover: {
-    borderRadius: 10,
-    height: 96,
+    borderRadius: 0,
+    height: 110,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  coverPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   },
   countBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    minWidth: 22,
+    top: designTokens.spacing.sm,
+    right: designTokens.spacing.sm,
+    borderRadius: designTokens.radius.full,
+    paddingHorizontal: designTokens.spacing.sm,
+    paddingVertical: designTokens.spacing.xxs,
+    minWidth: 24,
     alignItems: 'center',
   },
-  countBadgeText: {color: '#fff', fontSize: 10, fontWeight: '800'},
-  albumName: {fontSize: 14, fontWeight: '700'},
-  albumCount: {fontSize: 12, fontWeight: '500'},
-  modalBackdrop: {flex: 1, backgroundColor: '#00000075', justifyContent: 'flex-end'},
-  modalCard: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 28,
-    gap: 10,
+  countBadgeText: {color: '#fff', ...designTokens.typography.labelSmall},
+  albumTextArea: {
+    padding: designTokens.spacing.md,
+    gap: designTokens.spacing.xxs,
   },
-  modalHandle: {alignSelf: 'center', width: 38, height: 4, borderRadius: 2, marginBottom: 6},
-  modalTitle: {fontSize: 18, fontWeight: '700'},
-  modalSubtitle: {fontSize: 13, fontWeight: '400', marginTop: -4},
+  modalTitle: {...designTokens.typography.headlineMedium},
+  modalSubtitle: {...designTokens.typography.bodySmall, marginTop: -designTokens.spacing.xs},
   renameInput: {
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+    borderRadius: designTokens.radius.sm,
+    paddingHorizontal: designTokens.spacing.md,
     height: 44,
-    fontSize: 14,
+    ...designTokens.typography.bodyMedium,
   },
-  modalActions: {flexDirection: 'row', gap: 8},
+  modalActions: {flexDirection: 'row', gap: designTokens.spacing.sm, marginTop: designTokens.spacing.sm},
   modalButton: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: designTokens.radius.sm,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     height: 44,
     flexDirection: 'row',
-    gap: 5,
+    gap: designTokens.spacing.xs,
   },
-  modalButtonLabel: {fontSize: 13, fontWeight: '700'},
-  cancelAction: {alignItems: 'center', paddingVertical: 6},
-  cancelText: {fontSize: 13, fontWeight: '600'},
+  modalButtonLabel: designTokens.typography.labelLarge,
 });

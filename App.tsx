@@ -4,6 +4,7 @@ import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {RootNavigator} from './src/navigation/RootNavigator';
 import {useThemeStore} from './src/store/useThemeStore';
+import {Toast} from './src/components/ui/Toast';
 
 interface AppProps {}
 
@@ -16,6 +17,7 @@ const App: React.FC<AppProps> = () => {
         <View style={[styles.root, {backgroundColor: theme.colors.background}]}>
           <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
           <RootNavigator />
+          <Toast />
         </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>

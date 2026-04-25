@@ -64,12 +64,23 @@ export interface FilterState {
 export interface ThemeColors {
   background: string;
   surface: string;
+  surfaceVariant: string;
   text: string;
+  textSecondary: string;
   primary: string;
+  primaryContainer: string;
+  onPrimaryContainer: string;
   border: string;
+  outline: string;
+  outlineVariant: string;
   muted: string;
   danger: string;
+  dangerContainer: string;
   success: string;
+  successContainer: string;
+  warning: string;
+  warningContainer: string;
+  scrim: string;
 }
 
 export interface AppTheme {

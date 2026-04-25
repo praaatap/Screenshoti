@@ -18,8 +18,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import type {AppTheme, Screenshot} from '../types';
 import {SCREENSHOT_CARD_HEIGHT, ScreenshotCard} from './ScreenshotCard';
+import {designTokens} from '../theme/tokens';
 
-const GRID_GAP = 12;
+const GRID_GAP = designTokens.spacing.md;
 const GRID_ROW_HEIGHT = SCREENSHOT_CARD_HEIGHT + GRID_GAP;
 
 interface ScreenshotGridProps {
@@ -65,7 +66,40 @@ const SkeletonCard: React.FC<SkeletonCardProps> = ({theme}) => {
         {backgroundColor: theme.isDark ? '#2f3b4b' : '#dbe2eb'},
         animatedStyle,
       ]}
+      accessibilityLabel="Loading screenshot"
     />
+  );
+};
+
+interface FloatingIconProps {
+  theme: AppTheme;
+  icon: string;
+}
+
+const FloatingIcon: React.FC<FloatingIconProps> = ({theme, icon}) => {
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withRepeat(
+      withTiming(-6, {duration: 1500}),
+      -1,
+      true,
+    );
+  }, [translateY]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{translateY: translateY.value}],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        styles.emptyIconCircle,
+        {backgroundColor: theme.colors.primaryContainer},
+        animStyle,
+      ]}>
+      <MaterialCommunityIcons name={icon} size={designTokens.iconSize.xl} color={theme.colors.primary} />
+    </Animated.View>
   );
 };
 
@@ -95,7 +129,6 @@ export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({
 
   const getItemLayout = (_: ArrayLike<Screenshot> | null | undefined, index: number) => {
     const row = Math.floor(index / 2);
-
     return {
       index,
       length: GRID_ROW_HEIGHT,
@@ -120,12 +153,23 @@ export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({
 
   if (error && !isLoading) {
     return (
-      <View style={[styles.centerState, {backgroundColor: theme.colors.background}]}> 
-        <MaterialCommunityIcons name="alert-circle-outline" size={44} color={theme.colors.danger} />
-        <Text style={[styles.stateTitle, {color: theme.colors.text}]}>Unable to load screenshots</Text>
-        <Text style={[styles.stateDescription, {color: theme.colors.muted}]}>{error}</Text>
-        <Pressable style={[styles.stateButton, {backgroundColor: theme.colors.primary}]} onPress={onRetry}>
-          <Text style={styles.stateButtonLabel}>Retry</Text>
+      <View style={[styles.centerState, {backgroundColor: theme.colors.background}]} accessibilityRole="alert">
+        <View style={[styles.emptyIconCircle, {backgroundColor: theme.colors.dangerContainer}]}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={designTokens.iconSize.xl} color={theme.colors.danger} />
+        </View>
+        <Text style={[designTokens.typography.headlineMedium, styles.stateTitle, {color: theme.colors.text}]}>
+          Unable to load screenshots
+        </Text>
+        <Text style={[designTokens.typography.bodyMedium, styles.stateDescription, {color: theme.colors.muted}]}>
+          {error}
+        </Text>
+        <Pressable
+          style={[styles.stateButton, {backgroundColor: theme.colors.primary}]}
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading screenshots">
+          <MaterialCommunityIcons name="refresh" size={designTokens.iconSize.sm} color="#ffffff" />
+          <Text style={[designTokens.typography.labelLarge, {color: '#ffffff'}]}>Retry</Text>
         </Pressable>
       </View>
     );
@@ -144,7 +188,6 @@ export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({
         numColumns={2}
         getItemLayout={(_, index) => {
           const row = Math.floor(index / 2);
-
           return {
             index,
             length: GRID_ROW_HEIGHT,
@@ -154,21 +197,29 @@ export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({
         windowSize={7}
         columnWrapperStyle={styles.columnWrapper}
         contentContainerStyle={styles.listContent}
+        accessibilityLabel="Loading screenshots"
       />
     );
   }
 
   if (!isLoading && screenshots.length === 0) {
     return (
-      <View style={[styles.centerState, {backgroundColor: theme.colors.background}]}> 
-        <MaterialCommunityIcons name="image-off-outline" size={52} color={theme.colors.muted} />
-        <Text style={[styles.stateTitle, {color: theme.colors.text}]}>{emptyTitle}</Text>
-        <Text style={[styles.stateDescription, {color: theme.colors.muted}]}>{emptyDescription}</Text>
+      <View style={[styles.centerState, {backgroundColor: theme.colors.background}]}>
+        <FloatingIcon theme={theme} icon="image-multiple-outline" />
+        <Text style={[designTokens.typography.headlineMedium, styles.stateTitle, {color: theme.colors.text}]}>
+          {emptyTitle}
+        </Text>
+        <Text style={[designTokens.typography.bodyMedium, styles.stateDescription, {color: theme.colors.muted}]}>
+          {emptyDescription}
+        </Text>
         {emptyActionLabel && onEmptyActionPress ? (
           <Pressable
             style={[styles.stateButton, {backgroundColor: theme.colors.primary}]}
-            onPress={onEmptyActionPress}>
-            <Text style={styles.stateButtonLabel}>{emptyActionLabel}</Text>
+            onPress={onEmptyActionPress}
+            accessibilityRole="button"
+            accessibilityLabel={emptyActionLabel}>
+            <MaterialCommunityIcons name="import" size={designTokens.iconSize.sm} color="#ffffff" />
+            <Text style={[designTokens.typography.labelLarge, {color: '#ffffff'}]}>{emptyActionLabel}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -198,16 +249,18 @@ export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({
           onRefresh={onRefresh}
           tintColor={theme.colors.primary}
           colors={[theme.colors.primary]}
+          progressBackgroundColor={theme.colors.surface}
         />
       }
+      accessibilityLabel={`Screenshot grid with ${screenshots.length} items`}
     />
   );
 };
 
 const styles = StyleSheet.create({
   listContent: {
-    paddingHorizontal: 12,
-    paddingTop: 8,
+    paddingHorizontal: designTokens.spacing.md,
+    paddingTop: designTokens.spacing.sm,
     gap: GRID_GAP,
   },
   columnWrapper: {
@@ -220,32 +273,35 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 26,
-    gap: 10,
+    paddingHorizontal: designTokens.spacing.xxl,
+    gap: designTokens.spacing.md,
+  },
+  emptyIconCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: designTokens.spacing.sm,
   },
   stateTitle: {
-    fontSize: 19,
-    fontWeight: '700',
     textAlign: 'center',
   },
   stateDescription: {
-    fontSize: 14,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
   },
   stateButton: {
-    marginTop: 8,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  stateButtonLabel: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
+    marginTop: designTokens.spacing.sm,
+    borderRadius: designTokens.radius.md,
+    paddingHorizontal: designTokens.spacing.xl,
+    paddingVertical: designTokens.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: designTokens.spacing.sm,
   },
   skeleton: {
     height: SCREENSHOT_CARD_HEIGHT,
-    borderRadius: 14,
+    borderRadius: designTokens.radius.lg,
   },
 });
