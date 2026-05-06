@@ -8,6 +8,7 @@ import {
   type NativeSyntheticEvent,
   type TextInputSubmitEditingEventData,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Animated, {
@@ -16,7 +17,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import Share from 'react-native-share';
+import {shareMultipleScreenshots} from '../services/sharing/shareService';
 import {BottomActionBar} from '../components/BottomActionBar';
 import {ScreenshotGrid} from '../components/ScreenshotGrid';
 import {useFilteredScreenshots} from '../hooks/useFilteredScreenshots';
@@ -34,6 +35,7 @@ import type {HomeScreenProps, RootStackParamList, Screenshot} from '../types';
 
 export const HomeScreen: React.FC<HomeScreenProps> = () => {
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const theme = useThemeStore((state) => state.theme);
   const fabScale = useSharedValue(1);
   const fabStyle = useAnimatedStyle(() => ({transform: [{scale: fabScale.value}]}));
@@ -51,14 +53,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
   const isLoading = useScreenshotStore((state) => state.isLoading);
   const error = useScreenshotStore((state) => state.error);
   const reindex = useIntelligenceStore((state) => state.reindex);
-
   const albums = useAlbumStore((state) => state.albums);
-
   const searchQuery = useFilterStore((state) => state.searchQuery);
   const setSearchQuery = useFilterStore((state) => state.setSearchQuery);
-
   const {filteredScreenshots} = useFilteredScreenshots();
-
   const {isGranted, isLimited, ensurePhotoPermission} = usePermissions();
   const showToast = useToastStore((state) => state.show);
 
@@ -66,11 +64,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
   const [showDeleteSheet, setShowDeleteSheet] = useState(false);
 
   const selectionMode = selectedScreenshots.length > 0;
-  const favoriteCount = useMemo(() => screenshots.filter((shot) => shot.isFavorite).length, [screenshots]);
+  const favoriteCount = useMemo(
+    () => screenshots.filter((shot) => shot.isFavorite).length,
+    [screenshots],
+  );
 
   const handleInitialLoad = useCallback(async () => {
     const granted = await ensurePhotoPermission();
-
     if (granted) {
       await loadScreenshots();
       trackEvent('home_load_screenshots', {granted});
@@ -78,10 +78,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
   }, [ensurePhotoPermission, loadScreenshots]);
 
   useEffect(() => {
-    if (screenshots.length === 0) {
-      return;
-    }
-
+    if (screenshots.length === 0) return;
     reindex(screenshots);
   }, [reindex, screenshots]);
 
@@ -107,86 +104,65 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
   );
 
   const handleLongPressItem = useCallback(
-    (item: Screenshot) => {
-      toggleSelection(item.id);
-    },
+    (item: Screenshot) => { toggleSelection(item.id); },
     [toggleSelection],
   );
 
   const handlePressItem = useCallback(
-    (item: Screenshot) => {
+    (item: Screenshot, _index: number) => {
       if (selectionMode) {
         toggleSelection(item.id);
         return;
       }
-
       rootNavigation.navigate('Detail', {screenshotId: item.id});
     },
     [rootNavigation, selectionMode, toggleSelection],
   );
 
   const selectedUris = useMemo(() => {
-    if (!selectionMode) {
-      return [] as string[];
-    }
-
+    if (!selectionMode) return [] as string[];
     const selectedSet = new Set(selectedScreenshots);
     return screenshots.filter((shot) => selectedSet.has(shot.id)).map((shot) => shot.uri);
   }, [screenshots, selectedScreenshots, selectionMode]);
 
   const handleDeleteSelected = useCallback(() => {
-    if (selectedScreenshots.length === 0) {
-      return;
-    }
+    if (selectedScreenshots.length === 0) return;
     setShowDeleteSheet(true);
   }, [selectedScreenshots]);
 
   const confirmDeleteSelected = useCallback(() => {
+    setShowDeleteSheet(false);
     deleteMultiple(selectedScreenshots);
     clearSelection();
     showToast(`Deleted ${selectedScreenshots.length} screenshot(s).`, 'success');
   }, [clearSelection, deleteMultiple, selectedScreenshots, showToast]);
 
   const handleMoveSelected = useCallback(() => {
-    if (selectedScreenshots.length === 0) {
-      return;
-    }
-
+    if (selectedScreenshots.length === 0) return;
     const targetAlbum = albums.find((album) => album.id !== 'all-screenshots');
-
     if (!targetAlbum) {
       showToast('Create an album from the Albums tab first.', 'warning');
       return;
     }
-
     moveToAlbum(selectedScreenshots, targetAlbum.id);
     clearSelection();
-
-    showToast(`Moved ${selectedScreenshots.length} screenshot(s) to ${targetAlbum.name}.`, 'success');
-  }, [albums, clearSelection, moveToAlbum, selectedScreenshots]);
+    showToast(`Moved ${selectedScreenshots.length} to ${targetAlbum.name}.`, 'success');
+  }, [albums, clearSelection, moveToAlbum, selectedScreenshots, showToast]);
 
   const handleShareSelected = useCallback(async () => {
-    if (selectedUris.length === 0) {
-      return;
-    }
-
+    if (selectedUris.length === 0) return;
+    const selectedItems = screenshots.filter((s) => new Set(selectedScreenshots).has(s.id));
     try {
-      await Share.open({urls: selectedUris});
+      await shareMultipleScreenshots(selectedItems);
       clearSelection();
     } catch {
-      // Share dialog dismiss is a normal case.
+      // dismissed
     }
-  }, [clearSelection, selectedUris]);
+  }, [clearSelection, screenshots, selectedScreenshots, selectedUris]);
 
   const handleFavoriteSelected = useCallback(() => {
-    if (selectedScreenshots.length === 0) {
-      return;
-    }
-
-    selectedScreenshots.forEach((id) => {
-      toggleFavorite(id);
-    });
-
+    if (selectedScreenshots.length === 0) return;
+    selectedScreenshots.forEach((id) => toggleFavorite(id));
     clearSelection();
   }, [clearSelection, selectedScreenshots, toggleFavorite]);
 
@@ -195,19 +171,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
       selectAll();
       return;
     }
-
     clearSelection();
-    filteredScreenshots.forEach((shot) => {
-      selectScreenshot(shot.id);
-    });
+    filteredScreenshots.forEach((shot) => selectScreenshot(shot.id));
   }, [clearSelection, filteredScreenshots, screenshots.length, selectAll, selectScreenshot]);
 
   const onSearchSubmit = (event: NativeSyntheticEvent<TextInputSubmitEditingEventData>): void => {
     setSearchQuery(event.nativeEvent.text);
-  };
-
-  const openSearchScreen = (): void => {
-    rootNavigation.navigate('Search');
   };
 
   const handleFabImport = (): void => {
@@ -216,54 +185,56 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
 
   return (
     <View style={[styles.container, {backgroundColor: theme.colors.background}]}>
-      {/* Compact header */}
-      <View style={styles.header}>
+      {/* Header */}
+      <View style={[styles.header, {paddingTop: Math.max(insets.top, designTokens.spacing.sm)}]}>
         <View style={styles.headerLeft}>
-          <Text style={[designTokens.typography.titleLarge, {color: theme.colors.text}]}>Screenshoti</Text>
-          <Text style={[designTokens.typography.bodySmall, {color: theme.colors.muted}]}>
-            {screenshots.length} shots{favoriteCount > 0 ? ` · ${favoriteCount} faves` : ''}{albums.length > 1 ? ` · ${albums.length - 1} albums` : ''}
+          <Text style={[styles.wordmark, {color: theme.colors.text}]}>screenshoti</Text>
+          <Text style={[styles.headerMeta, {color: theme.colors.muted}]}>
+            {screenshots.length} shots
+            {favoriteCount > 0 ? ` · ${favoriteCount} saved` : ''}
+            {albums.length > 1 ? ` · ${albums.length - 1} albums` : ''}
           </Text>
         </View>
         <Pressable
-          style={[styles.headerIconButton, {backgroundColor: theme.colors.surfaceVariant}]}
-          onPress={openSearchScreen}>
-          <MaterialCommunityIcons name="magnify" size={designTokens.iconSize.md} color={theme.colors.text} />
+          style={[styles.headerIconButton, {borderColor: theme.colors.border}]}
+          onPress={() => rootNavigation.navigate('Search')}
+          accessibilityRole="button"
+          accessibilityLabel="Search">
+          <MaterialCommunityIcons name="magnify" size={designTokens.iconSize.sm} color={theme.colors.text} />
         </Pressable>
       </View>
 
-      {/* Inline search bar */}
-      <View style={styles.searchBar}>
-        <View
-          style={[
-            styles.searchInputWrap,
-            designTokens.elevation.low,
-            {backgroundColor: theme.colors.surface},
-          ]}>
-          <MaterialCommunityIcons name="magnify" size={designTokens.iconSize.sm} color={theme.colors.muted} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={onSearchSubmit}
-            placeholder="Search screenshots..."
-            placeholderTextColor={theme.colors.muted}
-            style={[designTokens.typography.bodyMedium, styles.searchInput, {color: theme.colors.text}]}
-            returnKeyType="search"
-          />
-          <Pressable onPress={openSearchScreen} hitSlop={8}>
-            <MaterialCommunityIcons name="tune-variant" size={designTokens.iconSize.sm} color={theme.colors.muted} />
+      {/* Inline search */}
+      <View style={[styles.searchBar, {borderBottomColor: theme.colors.border}]}>
+        <MaterialCommunityIcons name="magnify" size={designTokens.iconSize.xs} color={theme.colors.muted} />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmitEditing={onSearchSubmit}
+          placeholder="Filter by name or tag..."
+          placeholderTextColor={theme.colors.muted}
+          style={[styles.searchInput, {color: theme.colors.text}]}
+          returnKeyType="search"
+        />
+        {searchQuery.length > 0 && (
+          <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+            <MaterialCommunityIcons name="close-circle" size={designTokens.iconSize.xs} color={theme.colors.muted} />
           </Pressable>
-        </View>
+        )}
       </View>
 
+      {/* Permission nudge */}
       {!isGranted && !isLimited && !isLoading ? (
-        <View style={styles.permissionBanner}>
-          <Text style={[designTokens.typography.bodySmall, {color: theme.colors.text}]}>Gallery permission is required.</Text>
+        <View style={[styles.permissionBanner, {backgroundColor: theme.colors.surfaceVariant, borderBottomColor: theme.colors.border}]}>
+          <Text style={[styles.permissionText, {color: theme.colors.text}]}>
+            Gallery access needed
+          </Text>
           <Pressable
-            style={[styles.permissionButton, {backgroundColor: theme.colors.primary}]}
-            onPress={() => {
-              void handleInitialLoad();
-            }}>
-            <Text style={[designTokens.typography.labelMedium, {color: '#ffffff'}]}>Grant access</Text>
+            style={[styles.permissionButton, {backgroundColor: theme.colors.text}]}
+            onPress={() => void handleInitialLoad()}>
+            <Text style={[styles.permissionButtonText, {color: theme.colors.surface}]}>
+              Allow
+            </Text>
           </Pressable>
         </View>
       ) : null}
@@ -276,23 +247,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
         error={error}
         refreshing={refreshing}
         theme={theme}
-        onPressItem={(item) => {
-          handlePressItem(item);
-        }}
+        onPressItem={handlePressItem}
         onLongPressItem={handleLongPressItem}
-        onDeleteItem={(item) => {
-          deleteScreenshot(item.id);
-        }}
-        onToggleFavoriteItem={(item) => {
-          toggleFavorite(item.id);
-        }}
+        onDeleteItem={(item) => deleteScreenshot(item.id)}
+        onToggleFavoriteItem={(item) => toggleFavorite(item.id)}
         onRefresh={handleRefresh}
-        onRetry={() => {
-          void handleInitialLoad();
-        }}
-        emptyTitle="Your gallery is waiting"
-        emptyDescription="Import screenshots from your gallery to organize, search, and tag them."
-        emptyActionLabel="Import now"
+        onRetry={() => void handleInitialLoad()}
+        emptyTitle="Nothing here yet"
+        emptyDescription="Import your screenshots to start organizing, tagging, and searching them."
+        emptyActionLabel="Import"
         onEmptyActionPress={handleFabImport}
       />
 
@@ -305,12 +268,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
         onToggleFavorite={handleFavoriteSelected}
         onSelectAll={handleSelectAllVisible}
         onClearSelection={clearSelection}
-        onShare={() => {
-          void handleShareSelected();
-        }}
+        onShare={() => void handleShareSelected()}
       />
 
-      <Animated.View style={[styles.fab, {backgroundColor: theme.colors.primary}, designTokens.elevation.medium, fabStyle]}>
+      {/* FAB */}
+      <Animated.View
+        style={[
+          styles.fab,
+          {backgroundColor: theme.colors.text, borderColor: theme.colors.text},
+          fabStyle,
+        ]}>
         <Pressable
           style={styles.fabInner}
           onPress={handleFabImport}
@@ -318,7 +285,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
           onPressOut={() => { fabScale.value = withSpring(1, {damping: 12}); }}
           accessibilityRole="button"
           accessibilityLabel="Import screenshots from gallery">
-          <MaterialCommunityIcons name="import" size={designTokens.iconSize.md} color="#ffffff" />
+          <MaterialCommunityIcons name="plus" size={designTokens.iconSize.md} color={theme.colors.surface} />
         </Pressable>
       </Animated.View>
 
@@ -337,57 +304,47 @@ export const HomeScreen: React.FC<HomeScreenProps> = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: {flex: 1},
   header: {
     paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: designTokens.spacing.sm,
-    paddingBottom: designTokens.spacing.xs,
+    paddingBottom: designTokens.spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   headerLeft: {
     flex: 1,
-    gap: designTokens.spacing.xxs,
+    gap: 2,
+  },
+  wordmark: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    lineHeight: 24,
+  },
+  headerMeta: {
+    ...designTokens.typography.caption,
   },
   headerIconButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: designTokens.radius.md,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchBar: {
-    paddingHorizontal: designTokens.spacing.lg,
-    paddingVertical: designTokens.spacing.sm,
-  },
-  searchInputWrap: {
-    borderRadius: designTokens.radius.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: designTokens.spacing.sm,
-    paddingHorizontal: designTokens.spacing.md,
-    height: 44,
+    paddingHorizontal: designTokens.spacing.lg,
+    paddingVertical: designTokens.spacing.sm,
+    borderBottomWidth: 1,
   },
   searchInput: {
     flex: 1,
-  },
-  fab: {
-    position: 'absolute',
-    right: designTokens.spacing.xl,
-    bottom: designTokens.spacing.xxxl,
-    width: 56,
-    height: 56,
-    borderRadius: designTokens.radius.full,
-    overflow: 'hidden',
-  },
-  fabInner: {
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...designTokens.typography.bodyMedium,
+    paddingVertical: 0,
   },
   permissionBanner: {
     flexDirection: 'row',
@@ -395,10 +352,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: designTokens.spacing.lg,
     paddingVertical: designTokens.spacing.sm,
+    borderBottomWidth: 1,
+  },
+  permissionText: {
+    ...designTokens.typography.bodySmall,
   },
   permissionButton: {
     borderRadius: designTokens.radius.sm,
     paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.sm,
+    paddingVertical: designTokens.spacing.xs,
+  },
+  permissionButtonText: {
+    ...designTokens.typography.labelMedium,
+  },
+  fab: {
+    position: 'absolute',
+    right: designTokens.spacing.xl,
+    bottom: designTokens.spacing.xxxl,
+    width: 52,
+    height: 52,
+    borderRadius: designTokens.radius.full,
+    overflow: 'hidden',
+  },
+  fabInner: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

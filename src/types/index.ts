@@ -30,6 +30,8 @@ export interface ScreenshotState {
   clearSelection: () => void;
   selectAll: () => void;
   moveToAlbum: (ids: string[], albumId: string) => void;
+  removeFromAlbum: (ids: string[]) => void;
+  reorderTags: (id: string, newTagOrder: string[]) => void;
 }
 
 export interface Album {
@@ -103,6 +105,7 @@ export type RootStackParamList = {
   Detail: {screenshotId: string};
   AlbumDetail: {albumId: string; albumName: string};
   Search: undefined;
+  PinLock: undefined;
 };
 
 export type BottomTabParamList = {

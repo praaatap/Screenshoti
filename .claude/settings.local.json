@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(ls android/app/src/main/java/com/screenshoti/)",
+      "Bash(ls android/app/src/main/java/com/)"
+    ]
+  }
+}

@@ -12,6 +12,7 @@ const xorTransform = (input: string, secret: string): string => {
   let out = '';
   for (let i = 0; i < input.length; i += 1) {
     const keyCode = secret.charCodeAt(i % secret.length);
+    // eslint-disable-next-line no-bitwise
     out += String.fromCharCode(input.charCodeAt(i) ^ keyCode);
   }
 

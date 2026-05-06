@@ -28,7 +28,7 @@ const SettingToggleRow: React.FC<SettingToggleRowProps> = ({
 }) => (
   <SectionRow theme={theme} isLast={isLast}>
     <View style={styles.rowLeft}>
-      <MaterialCommunityIcons name={icon} size={designTokens.iconSize.sm} color={theme.colors.primary} />
+      <MaterialCommunityIcons name={icon} size={designTokens.iconSize.sm} color={theme.colors.text} />
       <View style={styles.rowText}>
         <Text style={[designTokens.typography.titleMedium, {color: theme.colors.text}]}>{label}</Text>
         <Text style={[designTokens.typography.bodySmall, {color: theme.colors.muted}]}>{description}</Text>
@@ -37,8 +37,8 @@ const SettingToggleRow: React.FC<SettingToggleRowProps> = ({
     <Switch
       value={value}
       onValueChange={onValueChange}
-      thumbColor={value ? theme.colors.primary : theme.colors.outline}
-      trackColor={{false: theme.colors.outlineVariant, true: theme.colors.primaryContainer}}
+      thumbColor={value ? theme.colors.text : theme.colors.outline}
+      trackColor={{false: theme.colors.outlineVariant, true: theme.colors.outline}}
       accessibilityLabel={label}
       accessibilityState={{checked: value}}
     />
@@ -104,7 +104,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
       <SectionCard title="Privacy & Security" theme={theme} noPadding>
         <SectionRow theme={theme}>
           <View style={styles.rowLeft}>
-            <MaterialCommunityIcons name="shield-lock" size={designTokens.iconSize.sm} color={theme.colors.primary} />
+            <MaterialCommunityIcons name="shield-lock" size={designTokens.iconSize.sm} color={theme.colors.text} />
             <View style={[styles.rowText, {flex: 1}]}>
               <Text style={[designTokens.typography.titleMedium, {color: theme.colors.text}]}>App lock (PIN)</Text>
               <Text style={[designTokens.typography.bodySmall, {color: theme.colors.muted}]}>Lock with a PIN code</Text>
@@ -124,7 +124,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
                   maxLength={6}
                 />
                 <Pressable
-                  style={[styles.pinButton, {backgroundColor: theme.colors.primary}]}
+                  style={[styles.pinButton, {backgroundColor: theme.colors.text}]}
                   onPress={() => {
                     setPinCode(pinInput);
                     setPinInput('');
@@ -180,11 +180,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
               }, 600);
             }}>
             {backupLoading ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <ActivityIndicator size="small" color={theme.colors.text} />
             ) : (
-              <MaterialCommunityIcons name="database-export" size={designTokens.iconSize.sm} color={theme.colors.primary} />
+              <MaterialCommunityIcons name="database-export" size={designTokens.iconSize.sm} color={theme.colors.text} />
             )}
-            <Text style={[designTokens.typography.titleMedium, {color: theme.colors.primary}]}>
+            <Text style={[designTokens.typography.titleMedium, {color: theme.colors.text}]}>
               {backupLoading ? 'Creating backup...' : 'Create encrypted backup'}
             </Text>
           </Pressable>
@@ -194,9 +194,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
       {/* Data */}
       <SectionCard title="Data" theme={theme} noPadding>
         <SectionRow theme={theme}>
-          <Pressable style={styles.actionRow} onPress={() => { void clearCache(); showToast('Cache cleared.', 'success'); }}>
-            <MaterialCommunityIcons name="broom" size={designTokens.iconSize.sm} color={theme.colors.primary} />
-            <Text style={[designTokens.typography.titleMedium, {color: theme.colors.primary}]}>Clear cache</Text>
+          <Pressable
+            style={styles.actionRow}
+            onPress={() => {
+              void clearCache();
+              showToast('Cache cleared.', 'success');
+            }}>
+            <MaterialCommunityIcons name="broom" size={designTokens.iconSize.sm} color={theme.colors.text} />
+            <Text style={[designTokens.typography.titleMedium, {color: theme.colors.text}]}>Clear cache</Text>
           </Pressable>
         </SectionRow>
         <SectionRow theme={theme} isLast>
@@ -206,8 +211,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
               const events = getTrackedEvents();
               showToast(`${events.length} analytics events captured.`, 'info');
             }}>
-            <MaterialCommunityIcons name="chart-bar" size={designTokens.iconSize.sm} color={theme.colors.primary} />
-            <Text style={[designTokens.typography.titleMedium, {color: theme.colors.primary}]}>View analytics status</Text>
+            <MaterialCommunityIcons name="chart-bar" size={designTokens.iconSize.sm} color={theme.colors.text} />
+            <Text style={[designTokens.typography.titleMedium, {color: theme.colors.text}]}>View analytics status</Text>
           </Pressable>
         </SectionRow>
       </SectionCard>

@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
-import {Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type {SmartCategory} from '../domain/organization/smartGrouping';
 import {ScreenshotGrid} from '../components/ScreenshotGrid';
@@ -14,17 +15,18 @@ import {designTokens} from '../theme/tokens';
 import type {SearchScreenProps} from '../types';
 
 const CATEGORY_ICONS: Record<string, string> = {
-  all: 'view-grid',
+  all: 'apps',
   receipt: 'receipt',
-  shopping: 'shopping',
+  shopping: 'shopping-outline',
   code: 'code-braces',
-  design: 'palette',
+  design: 'vector-square',
   docs: 'file-document-outline',
-  social: 'account-group',
+  social: 'account-multiple-outline',
 };
 
 export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
   const theme = useThemeStore((state) => state.theme);
+  const insets = useSafeAreaInsets();
   const loadScreenshots = useScreenshotStore((state) => state.loadScreenshots);
   const selectedScreenshots = useScreenshotStore((state) => state.selectedScreenshots);
   const selectScreenshot = useScreenshotStore((state) => state.selectScreenshot);
@@ -42,7 +44,6 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
   const saveQuery = useIntelligenceStore((state) => state.saveQuery);
 
   const {filteredScreenshots, allTags} = useFilteredScreenshots();
-
   const selectionMode = selectedScreenshots.length > 0;
   const [showRecent, setShowRecent] = useState(true);
   const [showTags, setShowTags] = useState(true);
@@ -51,21 +52,41 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
     'all', 'receipt', 'shopping', 'code', 'design', 'docs', 'social',
   ];
 
-  const hasFiltersActive = searchQuery.trim().length > 0 || activeTag !== null || selectedSmartCategory !== 'all';
+  const hasFiltersActive =
+    searchQuery.trim().length > 0 || activeTag !== null || selectedSmartCategory !== 'all';
 
   return (
-    <View style={[styles.container, {backgroundColor: theme.colors.background}]}>
-      <View style={[styles.header, designTokens.elevation.low, {backgroundColor: theme.colors.surface}]}>
+    <KeyboardAvoidingView
+      style={[styles.container, {backgroundColor: theme.colors.background}]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+
+      {/* Search header */}
+      <View style={[
+        styles.header,
+        {
+          backgroundColor: theme.colors.background,
+          borderBottomColor: theme.colors.border,
+          paddingTop: Math.max(insets.top, designTokens.spacing.sm),
+        },
+      ]}>
         <Pressable
-          style={[styles.backButton, {backgroundColor: theme.colors.surfaceVariant}]}
+          style={[styles.backButton, {borderColor: theme.colors.border}]}
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <MaterialCommunityIcons name="arrow-left" size={designTokens.iconSize.md} color={theme.colors.text} />
+          <MaterialCommunityIcons
+            name="arrow-left"
+            size={designTokens.iconSize.sm}
+            color={theme.colors.text}
+          />
         </Pressable>
 
-        <View style={[styles.searchWrap, {backgroundColor: theme.colors.background}]}>
-          <MaterialCommunityIcons name="magnify" size={designTokens.iconSize.sm} color={theme.colors.muted} />
+        <View style={[styles.searchWrap, {borderColor: theme.colors.border}]}>
+          <MaterialCommunityIcons
+            name="magnify"
+            size={designTokens.iconSize.xs}
+            color={theme.colors.muted}
+          />
           <TextInput
             value={searchQuery}
             onChangeText={(value) => {
@@ -76,7 +97,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
             }}
             placeholder="Search by name or tags"
             placeholderTextColor={theme.colors.muted}
-            style={[designTokens.typography.bodyMedium, styles.input, {color: theme.colors.text}]}
+            style={[styles.input, {color: theme.colors.text}]}
             autoFocus
             returnKeyType="search"
             onSubmitEditing={() => {
@@ -86,7 +107,11 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
           />
           {searchQuery.length > 0 && (
             <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-              <MaterialCommunityIcons name="close-circle" size={designTokens.iconSize.sm} color={theme.colors.muted} />
+              <MaterialCommunityIcons
+                name="close-circle"
+                size={designTokens.iconSize.xs}
+                color={theme.colors.muted}
+              />
             </Pressable>
           )}
         </View>
@@ -96,7 +121,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryBar}>
+        contentContainerStyle={[styles.categoryBar, {borderBottomColor: theme.colors.border}]}>
         {categories.map((category) => (
           <Chip
             key={category}
@@ -110,22 +135,24 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
         ))}
       </ScrollView>
 
-      {/* Recent queries - collapsible */}
+      {/* Recent queries */}
       {recentQueries.length > 0 && (
         <View>
-          <Pressable style={styles.sectionHeader} onPress={() => setShowRecent((p) => !p)}>
-            <View style={styles.sectionHeaderLeft}>
-              <MaterialCommunityIcons name="history" size={designTokens.iconSize.xs} color={theme.colors.muted} />
-              <Text style={[designTokens.typography.labelMedium, {color: theme.colors.muted}]}>Recent</Text>
-            </View>
+          <Pressable
+            style={[styles.sectionHeader, {borderBottomColor: theme.colors.border}]}
+            onPress={() => setShowRecent((p) => !p)}>
+            <Text style={[styles.sectionTitle, {color: theme.colors.muted}]}>Recent</Text>
             <MaterialCommunityIcons
               name={showRecent ? 'chevron-up' : 'chevron-down'}
-              size={designTokens.iconSize.sm}
+              size={designTokens.iconSize.xs}
               color={theme.colors.muted}
             />
           </Pressable>
           {showRecent && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}>
               {recentQueries.map((query) => (
                 <Chip
                   key={query}
@@ -141,24 +168,26 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
         </View>
       )}
 
-      {/* Tags - collapsible */}
+      {/* Tags */}
       {allTags.length > 0 && (
         <View>
-          <Pressable style={styles.sectionHeader} onPress={() => setShowTags((p) => !p)}>
-            <View style={styles.sectionHeaderLeft}>
-              <MaterialCommunityIcons name="tag-multiple" size={designTokens.iconSize.xs} color={theme.colors.muted} />
-              <Text style={[designTokens.typography.labelMedium, {color: theme.colors.muted}]}>Tags</Text>
-            </View>
+          <Pressable
+            style={[styles.sectionHeader, {borderBottomColor: theme.colors.border}]}
+            onPress={() => setShowTags((p) => !p)}>
+            <Text style={[styles.sectionTitle, {color: theme.colors.muted}]}>Tags</Text>
             <MaterialCommunityIcons
               name={showTags ? 'chevron-up' : 'chevron-down'}
-              size={designTokens.iconSize.sm}
+              size={designTokens.iconSize.xs}
               color={theme.colors.muted}
             />
           </Pressable>
           {showTags && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}>
               <Chip
-                label="All tags"
+                label="All"
                 isActive={activeTag === null}
                 variant="tag"
                 theme={theme}
@@ -179,12 +208,10 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
         </View>
       )}
 
-      {/* Empty discover state */}
       {!hasFiltersActive && filteredScreenshots.length > 0 && (
-        <View style={styles.discoverHint}>
-          <MaterialCommunityIcons name="compass-outline" size={designTokens.iconSize.sm} color={theme.colors.muted} />
-          <Text style={[designTokens.typography.bodySmall, {color: theme.colors.muted}]}>
-            Pick a category or type to search
+        <View style={[styles.hint, {borderBottomColor: theme.colors.border}]}>
+          <Text style={[styles.hintText, {color: theme.colors.muted}]}>
+            Pick a category, tag, or type to filter
           </Text>
         </View>
       )}
@@ -215,12 +242,12 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({navigation}) => {
             selectScreenshot(item.id);
           }
         }}
-        onRefresh={() => { void loadScreenshots(); }}
-        onRetry={() => { void loadScreenshots(); }}
-        emptyTitle="No matches found"
-        emptyDescription="Try another name, tag, or clear active filters."
+        onRefresh={() => void loadScreenshots()}
+        onRetry={() => void loadScreenshots()}
+        emptyTitle="No matches"
+        emptyDescription="Try a different keyword, tag, or clear the active filters."
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -231,54 +258,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: designTokens.spacing.sm,
     paddingHorizontal: designTokens.spacing.lg,
-    paddingVertical: designTokens.spacing.sm,
+    paddingBottom: designTokens.spacing.sm,
+    borderBottomWidth: 1,
   },
   backButton: {
-    height: 40,
-    width: 40,
-    borderRadius: designTokens.radius.full,
+    width: 36,
+    height: 36,
+    borderRadius: designTokens.radius.md,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchWrap: {
     flex: 1,
+    borderWidth: 1,
     borderRadius: designTokens.radius.md,
     paddingHorizontal: designTokens.spacing.md,
-    height: 44,
+    height: 40,
     flexDirection: 'row',
     alignItems: 'center',
     gap: designTokens.spacing.sm,
   },
-  input: {flex: 1},
+  input: {
+    flex: 1,
+    ...designTokens.typography.bodyMedium,
+    paddingVertical: 0,
+  },
   categoryBar: {
     paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: designTokens.spacing.md,
-    paddingBottom: designTokens.spacing.xs,
+    paddingTop: designTokens.spacing.sm,
+    paddingBottom: designTokens.spacing.sm,
     gap: designTokens.spacing.sm,
+    borderBottomWidth: 1,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: designTokens.spacing.lg,
-    paddingTop: designTokens.spacing.sm,
-    paddingBottom: designTokens.spacing.xs,
+    paddingVertical: designTokens.spacing.sm,
+    borderBottomWidth: 1,
   },
-  sectionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: designTokens.spacing.xs,
+  sectionTitle: {
+    ...designTokens.typography.labelSmall,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   chipRow: {
     paddingHorizontal: designTokens.spacing.lg,
-    paddingBottom: designTokens.spacing.xs,
+    paddingVertical: designTokens.spacing.sm,
     gap: designTokens.spacing.sm,
   },
-  discoverHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: designTokens.spacing.sm,
+  hint: {
+    paddingHorizontal: designTokens.spacing.lg,
     paddingVertical: designTokens.spacing.sm,
+    borderBottomWidth: 1,
+  },
+  hintText: {
+    ...designTokens.typography.bodySmall,
   },
 });

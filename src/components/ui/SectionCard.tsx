@@ -19,29 +19,16 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   noPadding = false,
 }) => {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {borderColor: theme.colors.border}]}>
       {title && (
-        <Text
-          style={[
-            designTokens.typography.labelMedium,
-            {
-              color: theme.colors.muted,
-              marginBottom: designTokens.spacing.sm,
-              marginLeft: designTokens.spacing.xs,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-            },
-          ]}>
-          {title}
-        </Text>
+        <Text style={[styles.title, {color: theme.colors.muted}]}>{title.toUpperCase()}</Text>
       )}
       <View
         style={[
           styles.card,
-          designTokens.elevation.low,
           {
             backgroundColor: theme.colors.surface,
-            borderRadius: designTokens.radius.lg,
+            borderColor: theme.colors.border,
           },
           !noPadding && styles.cardPadding,
           style,
@@ -58,19 +45,12 @@ interface SectionRowProps {
   isLast?: boolean;
 }
 
-export const SectionRow: React.FC<SectionRowProps> = ({
-  children,
-  theme,
-  isLast = false,
-}) => {
+export const SectionRow: React.FC<SectionRowProps> = ({children, theme, isLast = false}) => {
   return (
     <View
       style={[
         styles.row,
-        !isLast && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: theme.colors.outlineVariant,
-        },
+        !isLast && {borderBottomWidth: 1, borderBottomColor: theme.colors.border},
       ]}>
       {children}
     </View>
@@ -81,17 +61,26 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: designTokens.spacing.lg,
   },
+  title: {
+    ...designTokens.typography.labelSmall,
+    letterSpacing: 0.8,
+    marginBottom: designTokens.spacing.xs,
+    marginLeft: 2,
+  },
   card: {
+    borderRadius: designTokens.radius.lg,
+    borderWidth: 1,
     overflow: 'hidden',
   },
   cardPadding: {
     padding: designTokens.spacing.lg,
+    gap: designTokens.spacing.sm,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: designTokens.spacing.md + 2,
+    paddingVertical: designTokens.spacing.md,
     paddingHorizontal: designTokens.spacing.lg,
   },
 });

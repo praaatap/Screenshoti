@@ -1,17 +1,20 @@
-import React from 'react';
-import {Platform, Pressable, View} from 'react-native';
+import React, {useCallback, useEffect, useRef} from 'react';
+import {AppState, Platform, StyleSheet, View} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {NavigationContainer, DefaultTheme, DarkTheme, type Theme} from '@react-navigation/native';
+import {NavigationContainer, DefaultTheme, DarkTheme, type Theme, useNavigationContainerRef} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {designTokens} from '../theme/tokens';
+import {linking} from './linking';
 import {DetailScreen} from '../screens/DetailScreen';
+import {PinScreen} from '../screens/PinScreen';
 import {HomeScreen} from '../features/home/screens';
 import {AlbumsScreen, AlbumDetailScreen} from '../features/albums/screens';
 import {FavoritesScreen} from '../features/favorites/screens';
 import {SearchScreen} from '../features/search/screens';
 import {SettingsScreen} from '../features/settings/screens';
 import {useThemeStore} from '../store/useThemeStore';
+import {usePrivacyStore} from '../store/usePrivacyStore';
 import type {
   AlbumsStackParamList,
   BottomTabParamList,
@@ -35,7 +38,8 @@ const sharedHeaderOptions = (theme: ReturnType<typeof useThemeStore.getState>['t
   headerStyle: {backgroundColor: theme.colors.background},
   headerShadowVisible: false,
   headerTintColor: theme.colors.text,
-  headerTitleStyle: designTokens.typography.titleLarge,
+  headerTitleStyle: {...designTokens.typography.titleLarge, color: theme.colors.text},
+  headerBackTitleVisible: false,
 } as const);
 
 const HomeStackNavigator: React.FC<EmptyProps> = () => {
@@ -91,41 +95,35 @@ const MainTabsNavigator: React.FC<EmptyProps> = () => {
         headerShown: false,
         tabBarShowLabel: true,
         tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: theme.colors.primary,
+        tabBarActiveTintColor: theme.colors.text,
         tabBarInactiveTintColor: theme.colors.muted,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
-          borderTopWidth: 0,
-          height: 72,
-          paddingBottom: 12,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+          height: 68,
+          paddingBottom: 10,
           paddingTop: 8,
-          ...designTokens.elevation.medium,
-          ...(Platform.OS === 'ios' ? {shadowOffset: {width: 0, height: -3}} : {}),
         },
         tabBarLabelStyle: {
-          ...designTokens.typography.labelSmall,
+          ...designTokens.typography.caption,
           marginTop: 2,
         },
         tabBarIcon: ({color, focused}) => {
           const iconMap: Record<keyof BottomTabParamList, string> = {
-            HomeTab: 'image-multiple',
-            AlbumsTab: 'folder-multiple-image',
-            FavoritesTab: 'heart',
-            SettingsTab: 'cog',
+            HomeTab: focused ? 'image-multiple' : 'image-multiple-outline',
+            AlbumsTab: focused ? 'folder-multiple' : 'folder-multiple-outline',
+            FavoritesTab: focused ? 'heart' : 'heart-outline',
+            SettingsTab: focused ? 'cog' : 'cog-outline',
           };
 
           return (
-            <View style={{alignItems: 'center'}}>
-              <MaterialCommunityIcons name={iconMap[route.name]} size={designTokens.iconSize.md} color={color} />
-              {focused && (
-                <View style={{
-                  width: 24,
-                  height: 3,
-                  borderRadius: 1.5,
-                  backgroundColor: theme.colors.primary,
-                  marginTop: 3,
-                }} />
-              )}
+            <View style={styles.tabIconWrapper}>
+              <MaterialCommunityIcons
+                name={iconMap[route.name]}
+                size={designTokens.iconSize.sm}
+                color={color}
+              />
             </View>
           );
         },
@@ -139,7 +137,7 @@ const MainTabsNavigator: React.FC<EmptyProps> = () => {
           title: 'Favorites',
           tabBarAccessibilityLabel: `Favorites tab${favoriteCount > 0 ? `, ${favoriteCount} items` : ''}`,
           tabBarBadge: favoriteCount > 0 ? favoriteCount : undefined,
-          tabBarBadgeStyle: {backgroundColor: theme.colors.primary, fontSize: 10},
+          tabBarBadgeStyle: {backgroundColor: theme.colors.text, fontSize: 10},
         }}
       />
       <BottomTabs.Screen name="SettingsTab" component={SettingsStackNavigator} options={{title: 'Settings', tabBarAccessibilityLabel: 'Settings tab, app preferences'}} />
@@ -149,6 +147,10 @@ const MainTabsNavigator: React.FC<EmptyProps> = () => {
 
 export const RootNavigator: React.FC<EmptyProps> = () => {
   const appTheme = useThemeStore((state) => state.theme);
+  const pinEnabled = usePrivacyStore((state) => state.pinEnabled);
+  const lockOnBackground = usePrivacyStore((state) => state.lockOnBackground);
+  const navRef = useNavigationContainerRef<RootStackParamList>();
+  const appState = useRef(AppState.currentState);
 
   const navigationTheme: Theme = {
     ...(appTheme.isDark ? DarkTheme : DefaultTheme),
@@ -163,8 +165,42 @@ export const RootNavigator: React.FC<EmptyProps> = () => {
     },
   };
 
+  const handlePinUnlock = useCallback(() => {
+    if (navRef.isReady()) {
+      navRef.goBack();
+    }
+  }, [navRef]);
+
+  useEffect(() => {
+    if (!pinEnabled || !lockOnBackground) return;
+
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (
+        appState.current !== 'background' &&
+        appState.current !== 'inactive' &&
+        (nextState === 'background' || nextState === 'inactive')
+      ) {
+        appState.current = nextState;
+        return;
+      }
+      if (
+        (appState.current === 'background' || appState.current === 'inactive') &&
+        nextState === 'active'
+      ) {
+        appState.current = nextState;
+        if (navRef.isReady()) {
+          navRef.navigate('PinLock');
+        }
+      } else {
+        appState.current = nextState;
+      }
+    });
+
+    return () => sub.remove();
+  }, [pinEnabled, lockOnBackground, navRef]);
+
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navRef} theme={navigationTheme} linking={linking}>
       <RootStack.Navigator
         screenOptions={{
           ...sharedHeaderOptions(appTheme),
@@ -173,19 +209,11 @@ export const RootNavigator: React.FC<EmptyProps> = () => {
         <RootStack.Screen
           name="Detail"
           component={DetailScreen}
-          options={() => ({
+          options={{
             title: 'Details',
             animation: 'fade_from_bottom',
             animationDuration: 250,
-            headerRight: () => (
-              <Pressable
-                onPress={() => {}}
-                style={{padding: designTokens.spacing.xs}}
-                accessibilityLabel="Share screenshot">
-                <MaterialCommunityIcons name="share-variant-outline" size={designTokens.iconSize.md} color={appTheme.colors.text} />
-              </Pressable>
-            ),
-          })}
+          }}
         />
         <RootStack.Screen
           name="AlbumDetail"
@@ -201,7 +229,27 @@ export const RootNavigator: React.FC<EmptyProps> = () => {
             animationDuration: 300,
           }}
         />
+        <RootStack.Screen
+          name="PinLock"
+          options={{
+            headerShown: false,
+            animation: 'fade',
+            animationDuration: 200,
+            gestureEnabled: false,
+          }}>
+          {() => <PinScreen onUnlock={handlePinUnlock} />}
+        </RootStack.Screen>
       </RootStack.Navigator>
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  tabIconWrapper: {alignItems: 'center'},
+  tabActiveIndicator: {
+    width: 24,
+    height: 3,
+    borderRadius: 1.5,
+    marginTop: 3,
+  },
+});

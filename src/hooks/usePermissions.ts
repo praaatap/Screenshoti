@@ -4,7 +4,6 @@ import {
   PERMISSIONS,
   RESULTS,
   check,
-  checkMultiple,
   openSettings,
   request,
   type Permission,

@@ -132,10 +132,10 @@ export const useGroupedScreenshots = (
     filteredScreenshots.forEach((shot) => {
       const d = new Date(shot.createdAt);
       const ds = d.toDateString();
-      if (ds === todayStr) buckets['Today'].push(shot);
-      else if (ds === yesterdayStr) buckets['Yesterday'].push(shot);
-      else if (d >= weekAgo) buckets['This week'].push(shot);
-      else buckets['Older'].push(shot);
+      if (ds === todayStr) { buckets.Today.push(shot); }
+      else if (ds === yesterdayStr) { buckets.Yesterday.push(shot); }
+      else if (d >= weekAgo) { buckets['This week'].push(shot); }
+      else { buckets.Older.push(shot); }
     });
 
     return Object.entries(buckets)

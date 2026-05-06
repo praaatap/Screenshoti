@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  View,
-} from 'react-native';
+import {Modal, Pressable, StyleSheet, View} from 'react-native';
 import Animated, {FadeIn, FadeOut, SlideInDown, SlideOutDown} from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {AppTheme} from '../../types';
@@ -17,12 +12,7 @@ interface BottomSheetProps {
   children: React.ReactNode;
 }
 
-export const BottomSheet: React.FC<BottomSheetProps> = ({
-  visible,
-  onClose,
-  theme,
-  children,
-}) => {
+export const BottomSheet: React.FC<BottomSheetProps> = ({visible, onClose, theme, children}) => {
   const insets = useSafeAreaInsets();
 
   return (
@@ -34,25 +24,25 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       onRequestClose={onClose}>
       <View style={styles.wrapper}>
         <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
+          entering={FadeIn.duration(180)}
+          exiting={FadeOut.duration(140)}
           style={[styles.backdrop, {backgroundColor: theme.colors.scrim}]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
 
         <Animated.View
-          entering={SlideInDown.duration(300).springify().damping(20)}
-          exiting={SlideOutDown.duration(200)}
+          entering={SlideInDown.duration(260).springify().damping(22)}
+          exiting={SlideOutDown.duration(180)}
           style={[
             styles.sheet,
-            designTokens.elevation.high,
             {
               backgroundColor: theme.colors.surface,
+              borderTopColor: theme.colors.border,
               paddingBottom: insets.bottom + designTokens.spacing.lg,
             },
           ]}>
           <View style={styles.handleBar}>
-            <View style={[styles.handle, {backgroundColor: theme.colors.outlineVariant}]} />
+            <View style={[styles.handle, {backgroundColor: theme.colors.outline}]} />
           </View>
           {children}
         </Animated.View>
@@ -70,18 +60,19 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
   },
   sheet: {
-    borderTopLeftRadius: designTokens.radius.xxl,
-    borderTopRightRadius: designTokens.radius.xxl,
-    paddingHorizontal: designTokens.spacing.xxl,
-    paddingTop: designTokens.spacing.sm,
+    borderTopLeftRadius: designTokens.radius.xl,
+    borderTopRightRadius: designTokens.radius.xl,
+    borderTopWidth: 1,
+    paddingHorizontal: designTokens.spacing.xl,
+    paddingTop: designTokens.spacing.xs,
   },
   handleBar: {
     alignItems: 'center',
     paddingVertical: designTokens.spacing.sm,
   },
   handle: {
-    width: 36,
-    height: 4,
+    width: 32,
+    height: 3,
     borderRadius: 2,
   },
 });

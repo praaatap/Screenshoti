@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useShallow} from 'zustand/react/shallow';
+import {shareAlbum} from '../services/sharing/shareService';
 import {useAlbumStore} from '../store/useAlbumStore';
 import {useScreenshotStore} from '../store/useScreenshotStore';
 import {useThemeStore} from '../store/useThemeStore';
@@ -30,7 +31,7 @@ import type {Album, AlbumsScreenProps, RootStackParamList} from '../types';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ALBUM_ROW_HEIGHT = 200;
-const ALBUM_COLORS = ['#0b7a75', '#7c3aed', '#c2410c', '#0369a1', '#b45309', '#15803d'];
+const ALBUM_COLORS = ['#09090b', '#09090b', '#09090b', '#09090b', '#09090b', '#09090b'];
 
 type SortMode = 'name' | 'count' | 'date';
 
@@ -76,7 +77,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({item, theme, onPress, onLongPress}
 
         <View style={styles.albumCardBody}>
           {/* Cover area - show actual thumbnail */}
-          <View style={[styles.cover, {backgroundColor: `${item.accentColor}12`}]}>
+          <View style={[styles.cover, {backgroundColor: theme.colors.surfaceVariant, borderBottomColor: theme.colors.border}]}>
             {item.computedCoverUri ? (
               <Image
                 source={{uri: item.computedCoverUri}}
@@ -86,15 +87,17 @@ const AlbumCard: React.FC<AlbumCardProps> = ({item, theme, onPress, onLongPress}
             ) : (
               <View style={styles.coverPlaceholder}>
                 <MaterialCommunityIcons
-                  name="folder-image"
+                  name="folder-outline"
                   size={designTokens.iconSize.xl}
-                  color={item.accentColor}
+                  color={theme.colors.muted}
                 />
               </View>
             )}
             {item.computedCount > 0 && (
-              <View style={[styles.countBadge, {backgroundColor: item.accentColor}]}>
-                <Text style={styles.countBadgeText}>{item.computedCount}</Text>
+              <View style={[styles.countBadge, {backgroundColor: theme.colors.text}]}>
+                <Text style={[styles.countBadgeText, {color: theme.colors.surface}]}>
+                  {item.computedCount}
+                </Text>
               </View>
             )}
           </View>
@@ -259,7 +262,7 @@ export const AlbumsScreen: React.FC<AlbumsScreenProps> = () => {
         <Pressable
           style={[
             styles.createButton,
-            {backgroundColor: createValue.trim() ? theme.colors.primary : theme.colors.border},
+            {backgroundColor: createValue.trim() ? theme.colors.text : theme.colors.border},
           ]}
           onPress={handleCreateAlbum}
           disabled={!createValue.trim()}>
@@ -273,8 +276,8 @@ export const AlbumsScreen: React.FC<AlbumsScreenProps> = () => {
           {computedAlbums.length} albums
         </Text>
         <Pressable style={styles.sortButton} onPress={cycleSortMode}>
-          <MaterialCommunityIcons name="sort" size={15} color={theme.colors.primary} />
-          <Text style={[styles.sortButtonText, {color: theme.colors.primary}]}>
+          <MaterialCommunityIcons name="sort" size={15} color={theme.colors.text} />
+          <Text style={[styles.sortButtonText, {color: theme.colors.text}]}>
             {sortLabel[sortMode]}
           </Text>
         </Pressable>
@@ -327,8 +330,8 @@ export const AlbumsScreen: React.FC<AlbumsScreenProps> = () => {
           <Pressable
             style={[styles.modalButton, {backgroundColor: theme.colors.background, borderColor: theme.colors.border}]}
             onPress={saveRename}>
-            <MaterialCommunityIcons name="pencil" size={16} color={theme.colors.primary} />
-            <Text style={[styles.modalButtonLabel, {color: theme.colors.primary}]}>Rename</Text>
+            <MaterialCommunityIcons name="pencil" size={16} color={theme.colors.text} />
+            <Text style={[styles.modalButtonLabel, {color: theme.colors.text}]}>Rename</Text>
           </Pressable>
 
           <Pressable
@@ -339,6 +342,17 @@ export const AlbumsScreen: React.FC<AlbumsScreenProps> = () => {
             }}>
             <MaterialCommunityIcons name="open-in-app" size={16} color={theme.colors.text} />
             <Text style={[styles.modalButtonLabel, {color: theme.colors.text}]}>Open</Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.modalButton, {backgroundColor: theme.colors.background, borderColor: theme.colors.border}]}
+            onPress={() => {
+              if (!activeAlbum) return;
+              const albumScreenshots = screenshots.filter((s) => s.albumId === activeAlbum.id);
+              void shareAlbum(activeAlbum.id, activeAlbum.name, albumScreenshots);
+            }}>
+            <MaterialCommunityIcons name="share-variant-outline" size={16} color={theme.colors.text} />
+            <Text style={[styles.modalButtonLabel, {color: theme.colors.text}]}>Share</Text>
           </Pressable>
 
           {activeAlbum?.id !== 'all-screenshots' && (

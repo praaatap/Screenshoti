@@ -23,7 +23,7 @@ const getFallbackName = (uri: string, createdAt: string): string => {
   return `screenshot-${createdAt}`;
 };
 
-export const isLikelyScreenshot = (fileName: string, uri: any): boolean =>
+export const isLikelyScreenshot = (fileName: string): boolean =>
   SCREENSHOT_PATTERN.test(fileName);
 
 export const mapCameraRollPhoto = (

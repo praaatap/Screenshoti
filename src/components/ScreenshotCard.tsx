@@ -1,4 +1,4 @@
-import React, {useCallback} from 'react';
+import React from 'react';
 import {Dimensions, StyleSheet, Text, View, Image} from 'react-native';
 import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import Animated, {
@@ -32,7 +32,7 @@ interface ScreenshotCardProps {
   onToggleFavorite?: () => void;
 }
 
-export const ScreenshotCard: React.FC<ScreenshotCardProps> = ({
+const ScreenshotCardInner: React.FC<ScreenshotCardProps> = ({
   screenshot,
   isSelected,
   selectionMode,
@@ -84,7 +84,7 @@ export const ScreenshotCard: React.FC<ScreenshotCardProps> = ({
 
   const tapGesture = Gesture.Tap()
     .maxDuration(250)
-    .onBegin(() => { pressScale.value = withSpring(0.95, {damping: 15}); })
+    .onBegin(() => { pressScale.value = withSpring(0.96, {damping: 15}); })
     .onEnd(() => {
       pressScale.value = withSpring(1);
       runOnJS(onPress)();
@@ -108,8 +108,8 @@ export const ScreenshotCard: React.FC<ScreenshotCardProps> = ({
 
   const deleteRevealStyle = useAnimatedStyle(() => {
     const progress = Math.min(Math.abs(translateX.value) / SWIPE_THRESHOLD, 1);
-    const rotate = interpolate(progress, [0, 1], [0, -15]);
-    const scale = interpolate(progress, [0, 0.5, 1], [0.8, 1, 1.15]);
+    const rotate = interpolate(progress, [0, 1], [0, -10]);
+    const scale = interpolate(progress, [0, 0.5, 1], [0.8, 1, 1.1]);
     return {
       opacity: progress,
       transform: [{rotate: `${rotate}deg`}, {scale}],
@@ -123,19 +123,22 @@ export const ScreenshotCard: React.FC<ScreenshotCardProps> = ({
 
   return (
     <View style={styles.wrapper}>
+      {/* Swipe-to-delete reveal */}
       <Animated.View style={[styles.deleteReveal, deleteRevealStyle]}>
-        <MaterialCommunityIcons name="delete" size={designTokens.iconSize.lg} color="#fff" />
+        <MaterialCommunityIcons name="delete" size={designTokens.iconSize.md} color="#fff" />
         <Text style={styles.deleteRevealText}>Delete</Text>
       </Animated.View>
 
       <GestureDetector gesture={composed}>
         <Animated.View
-          entering={FadeIn.duration(200)}
+          entering={FadeIn.duration(180)}
           style={[
             styles.card,
-            designTokens.elevation.low,
-            {backgroundColor: theme.colors.surface},
-            isSelected && {borderWidth: 2, borderColor: theme.colors.primary},
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: isSelected ? theme.colors.text : theme.colors.border,
+              borderWidth: isSelected ? 2 : 1,
+            },
             cardStyle,
           ]}
           accessibilityRole="button"
@@ -152,20 +155,25 @@ export const ScreenshotCard: React.FC<ScreenshotCardProps> = ({
           {/* Selection overlay */}
           {selectionMode && (
             <Animated.View
-              entering={ZoomIn.duration(150)}
+              entering={ZoomIn.duration(120)}
               style={[
                 styles.selectionOverlay,
-                {backgroundColor: isSelected ? `${theme.colors.primary}44` : 'transparent'},
+                {backgroundColor: isSelected ? 'rgba(0,0,0,0.35)' : 'transparent'},
               ]}>
               <View style={[
                 styles.checkbox,
                 {
-                  backgroundColor: isSelected ? theme.colors.primary : 'transparent',
-                  borderColor: isSelected ? theme.colors.primary : '#fff',
+                  backgroundColor: isSelected ? theme.colors.surface : 'transparent',
+                  borderColor: '#fff',
+                  borderWidth: 2,
                 },
               ]}>
                 {isSelected && (
-                  <MaterialCommunityIcons name="check" size={designTokens.iconSize.xs} color="#fff" />
+                  <MaterialCommunityIcons
+                    name="check"
+                    size={designTokens.iconSize.xs}
+                    color={theme.colors.text}
+                  />
                 )}
               </View>
             </Animated.View>
@@ -174,40 +182,28 @@ export const ScreenshotCard: React.FC<ScreenshotCardProps> = ({
           {/* Favorite badge */}
           {screenshot.isFavorite && !selectionMode && (
             <View style={styles.favBadge}>
-              <MaterialCommunityIcons name="heart" size={designTokens.iconSize.xs} color="#f43f5e" />
+              <MaterialCommunityIcons name="heart" size={10} color="#09090b" />
             </View>
           )}
 
           {/* Tag count badge */}
           {screenshot.tags.length > 0 && !selectionMode && (
-            <View style={[styles.tagBadge, {backgroundColor: theme.colors.primary}]}>
-              <Text style={styles.tagBadgeText}>{screenshot.tags.length}</Text>
-            </View>
-          )}
-
-          {/* Note indicator */}
-          {screenshot.note && !selectionMode && (
-            <View style={[styles.noteBadge, {backgroundColor: theme.colors.surface}]}>
-              <MaterialCommunityIcons name="note-text" size={designTokens.iconSize.xs} color={theme.colors.muted} />
+            <View style={[styles.tagBadge, {backgroundColor: theme.colors.surface}]}>
+              <Text style={[styles.tagBadgeText, {color: theme.colors.text}]}>
+                {screenshot.tags.length}
+              </Text>
             </View>
           )}
 
           {/* Double-tap heart burst */}
           <Animated.View style={[styles.heartBurst, heartStyle]} pointerEvents="none">
-            <MaterialCommunityIcons name="heart" size={designTokens.iconSize.xl + 16} color="#f43f5e" />
+            <MaterialCommunityIcons name="heart" size={52} color="#fff" />
           </Animated.View>
 
-          {/* Gradient overlay for text */}
-          <View style={styles.gradientOverlay}>
-            <View style={styles.gradientLayer1} />
-            <View style={styles.gradientLayer2} />
-            <View style={styles.gradientLayer3} />
-          </View>
-
-          {/* File name */}
-          <View style={styles.nameWrap}>
+          {/* Bottom name strip */}
+          <View style={[styles.nameStrip, {backgroundColor: theme.isDark ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.6)'}]}>
             <Text numberOfLines={1} style={styles.nameText}>
-              {truncateText(screenshot.fileName, 28)}
+              {truncateText(screenshot.fileName, 26)}
             </Text>
           </View>
         </Animated.View>
@@ -215,6 +211,17 @@ export const ScreenshotCard: React.FC<ScreenshotCardProps> = ({
     </View>
   );
 };
+
+export const ScreenshotCard = React.memo(ScreenshotCardInner, (prev, next) => {
+  return (
+    prev.screenshot.id === next.screenshot.id &&
+    prev.isSelected === next.isSelected &&
+    prev.selectionMode === next.selectionMode &&
+    prev.screenshot.isFavorite === next.screenshot.isFavorite &&
+    prev.screenshot.tags.length === next.screenshot.tags.length &&
+    prev.theme === next.theme
+  );
+});
 
 const styles = StyleSheet.create({
   wrapper: {flex: 1, position: 'relative'},
@@ -252,10 +259,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderRadius: designTokens.radius.full,
-    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -263,66 +269,41 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: designTokens.spacing.sm,
     right: designTokens.spacing.sm,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255,255,255,0.95)',
     borderRadius: designTokens.radius.full,
-    padding: designTokens.spacing.xs,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tagBadge: {
     position: 'absolute',
     top: designTokens.spacing.sm,
     left: designTokens.spacing.sm,
-    borderRadius: designTokens.radius.full,
-    paddingHorizontal: designTokens.spacing.sm,
-    paddingVertical: designTokens.spacing.xxs,
-    minWidth: 22,
+    borderRadius: designTokens.radius.xs,
+    paddingHorizontal: designTokens.spacing.xs,
+    paddingVertical: 2,
+    minWidth: 20,
     alignItems: 'center',
   },
   tagBadgeText: {
-    color: '#fff',
-    ...designTokens.typography.labelSmall,
-  },
-  noteBadge: {
-    position: 'absolute',
-    bottom: 36,
-    right: designTokens.spacing.sm,
-    borderRadius: designTokens.radius.sm,
-    padding: designTokens.spacing.xs,
-    ...designTokens.elevation.low,
+    ...designTokens.typography.caption,
   },
   heartBurst: {
     position: 'absolute',
     alignSelf: 'center',
     top: '25%',
   },
-  gradientOverlay: {
+  nameStrip: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: '40%',
-  },
-  gradientLayer1: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.02)',
-  },
-  gradientLayer2: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-  },
-  gradientLayer3: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  nameWrap: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.sm,
+    paddingHorizontal: designTokens.spacing.sm,
+    paddingVertical: designTokens.spacing.xs,
   },
   nameText: {
     color: '#ffffff',
-    ...designTokens.typography.labelSmall,
+    ...designTokens.typography.caption,
   },
 });

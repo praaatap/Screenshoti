@@ -83,8 +83,8 @@ export const useScreenshotStore = create<ScreenshotState>()(
           const {photos: allPhotos} = await fetchAllScreenshots(existingByUri);
 
           // Prefer screenshot-named files; fall back to all photos only as last resort
-          const screenshotOnly = allPhotos.filter((item :any) =>
-            isLikelyScreenshot(item.fileName, item.uri),
+          const screenshotOnly = allPhotos.filter((item) =>
+            isLikelyScreenshot(item.fileName),
           );
 
           const resolved = screenshotOnly.length > 0 ? screenshotOnly : allPhotos;
@@ -238,7 +238,14 @@ export const useScreenshotStore = create<ScreenshotState>()(
     // ── Persist config ──────────────────────────────────────────────────────
     {
       name: 'screenshot-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => ({
+        getItem: (key: string) =>
+          AsyncStorage.getItem(key).catch(() => null),
+        setItem: (key: string, value: string) =>
+          AsyncStorage.setItem(key, value).catch(() => undefined),
+        removeItem: (key: string) =>
+          AsyncStorage.removeItem(key).catch(() => undefined),
+      })),
       // Only persist user-defined data — NOT isLoading, error, selectedScreenshots
       // Screenshots themselves are re-fetched from CameraRoll on each load,
       // but we persist tags, notes, favorites, albumId so they survive app restarts.

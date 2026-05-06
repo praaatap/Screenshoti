@@ -27,12 +27,12 @@ interface BottomActionBarProps {
 interface ActionItemProps {
   icon: string;
   label: string;
-  color: string;
-  bgColor: string;
   onPress: () => void;
+  danger?: boolean;
+  theme: AppTheme;
 }
 
-const ActionItem: React.FC<ActionItemProps> = ({icon, label, color, bgColor, onPress}) => {
+const ActionItem: React.FC<ActionItemProps> = ({icon, label, onPress, danger = false, theme}) => {
   const scale = useSharedValue(1);
   const aStyle = useAnimatedStyle(() => ({transform: [{scale: scale.value}]}));
 
@@ -45,10 +45,24 @@ const ActionItem: React.FC<ActionItemProps> = ({icon, label, color, bgColor, onP
         onPressOut={() => { scale.value = withSpring(1, {damping: 15}); }}
         accessibilityRole="button"
         accessibilityLabel={label}>
-        <View style={[styles.actionIconCircle, {backgroundColor: bgColor}]}>
-          <MaterialCommunityIcons name={icon} size={designTokens.iconSize.md} color={color} />
+        <View style={[
+          styles.actionIconBox,
+          danger
+            ? {backgroundColor: theme.colors.dangerContainer, borderColor: theme.colors.danger}
+            : {backgroundColor: theme.colors.surfaceVariant, borderColor: theme.colors.border},
+        ]}>
+          <MaterialCommunityIcons
+            name={icon}
+            size={designTokens.iconSize.sm}
+            color={danger ? theme.colors.danger : theme.colors.text}
+          />
         </View>
-        <Text style={[designTokens.typography.caption, {color}]}>{label}</Text>
+        <Text style={[
+          styles.actionLabel,
+          {color: danger ? theme.colors.danger : theme.colors.muted},
+        ]}>
+          {label}
+        </Text>
       </Pressable>
     </Animated.View>
   );
@@ -69,68 +83,52 @@ export const BottomActionBar: React.FC<BottomActionBarProps> = ({
 
   if (!visible) return null;
 
-  const glassBg = theme.isDark ? 'rgba(22,27,34,0.92)' : 'rgba(255,255,255,0.92)';
-
   return (
     <Animated.View
-      entering={FadeInDown.springify().damping(16)}
-      exiting={FadeOutDown.duration(180)}
+      entering={FadeInDown.springify().damping(18)}
+      exiting={FadeOutDown.duration(160)}
       style={[
         styles.bar,
-        designTokens.elevation.high,
         {
-          backgroundColor: glassBg,
-          paddingBottom: Math.max(insets.bottom, designTokens.spacing.md),
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
+          paddingBottom: insets.bottom + designTokens.spacing.sm,
         },
       ]}>
 
       <View style={styles.topRow}>
-        <View style={[styles.countPill, {backgroundColor: theme.colors.primary}]}>
-          <Text style={[designTokens.typography.labelSmall, {color: '#fff'}]}>{selectedCount} selected</Text>
+        <View style={[styles.countPill, {backgroundColor: theme.colors.text}]}>
+          <Text style={[styles.countText, {color: theme.colors.surface}]}>
+            {selectedCount} selected
+          </Text>
         </View>
         <View style={styles.topRowRight}>
-          <Pressable onPress={onSelectAll} style={styles.topAction} accessibilityRole="button" accessibilityLabel="Select all">
-            <Text style={[designTokens.typography.labelMedium, {color: theme.colors.primary}]}>Select all</Text>
+          <Pressable
+            onPress={onSelectAll}
+            style={styles.topAction}
+            accessibilityRole="button"
+            accessibilityLabel="Select all">
+            <Text style={[styles.topActionText, {color: theme.colors.text}]}>All</Text>
           </Pressable>
           <Pressable
             onPress={onClearSelection}
-            style={[styles.closeButton, {backgroundColor: theme.colors.surfaceVariant}]}
+            style={[styles.closeButton, {borderColor: theme.colors.border}]}
             accessibilityRole="button"
             accessibilityLabel="Clear selection">
-            <MaterialCommunityIcons name="close" size={designTokens.iconSize.sm} color={theme.colors.muted} />
+            <MaterialCommunityIcons
+              name="close"
+              size={designTokens.iconSize.xs}
+              color={theme.colors.muted}
+            />
           </Pressable>
         </View>
       </View>
 
       <View style={styles.actions}>
-        <ActionItem
-          icon="share-variant-outline"
-          label="Share"
-          color={theme.colors.text}
-          bgColor={theme.colors.surfaceVariant}
-          onPress={onShare}
-        />
-        <ActionItem
-          icon="folder-move-outline"
-          label="Move"
-          color={theme.colors.text}
-          bgColor={theme.colors.surfaceVariant}
-          onPress={onMoveToAlbum}
-        />
-        <ActionItem
-          icon="heart-outline"
-          label="Favorite"
-          color={theme.colors.primary}
-          bgColor={theme.colors.primaryContainer}
-          onPress={onToggleFavorite}
-        />
-        <ActionItem
-          icon="delete-outline"
-          label="Delete"
-          color={theme.colors.danger}
-          bgColor={theme.colors.dangerContainer}
-          onPress={onDelete}
-        />
+        <ActionItem icon="share-variant-outline" label="Share" theme={theme} onPress={onShare} />
+        <ActionItem icon="folder-move-outline" label="Move" theme={theme} onPress={onMoveToAlbum} />
+        <ActionItem icon="heart-outline" label="Fave" theme={theme} onPress={onToggleFavorite} />
+        <ActionItem icon="delete-outline" label="Delete" theme={theme} onPress={onDelete} danger />
       </View>
     </Animated.View>
   );
@@ -142,8 +140,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopLeftRadius: designTokens.radius.xl,
-    borderTopRightRadius: designTokens.radius.xl,
+    borderTopWidth: 1,
     paddingTop: designTokens.spacing.md,
   },
   topRow: {
@@ -156,14 +153,27 @@ const styles = StyleSheet.create({
   countPill: {
     borderRadius: designTokens.radius.full,
     paddingHorizontal: designTokens.spacing.md,
-    paddingVertical: designTokens.spacing.xs,
+    paddingVertical: designTokens.spacing.xxs,
   },
-  topRowRight: {flexDirection: 'row', alignItems: 'center', gap: designTokens.spacing.sm},
-  topAction: {paddingHorizontal: designTokens.spacing.xs},
+  countText: {
+    ...designTokens.typography.labelSmall,
+  },
+  topRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: designTokens.spacing.sm,
+  },
+  topAction: {
+    paddingHorizontal: designTokens.spacing.xs,
+  },
+  topActionText: {
+    ...designTokens.typography.labelMedium,
+  },
   closeButton: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     borderRadius: designTokens.radius.full,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -179,11 +189,15 @@ const styles = StyleSheet.create({
     gap: designTokens.spacing.xs,
     paddingVertical: designTokens.spacing.sm,
   },
-  actionIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: designTokens.radius.full,
+  actionIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: designTokens.radius.md,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  actionLabel: {
+    ...designTokens.typography.caption,
   },
 });

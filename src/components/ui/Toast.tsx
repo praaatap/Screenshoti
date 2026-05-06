@@ -1,17 +1,17 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import Animated, {FadeInUp, FadeOutUp} from 'react-native-reanimated';
+import Animated, {FadeInDown, FadeOutDown} from 'react-native-reanimated';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useToastStore, type ToastType} from '../../store/useToastStore';
 import {useThemeStore} from '../../store/useThemeStore';
 import {designTokens} from '../../theme/tokens';
 
-const toastConfig: Record<ToastType, {icon: string; lightBg: string; darkBg: string; lightText: string; darkText: string}> = {
-  success: {icon: 'check-circle', lightBg: '#d4edda', darkBg: '#0d3320', lightText: '#155724', darkText: '#4ade80'},
-  error: {icon: 'alert-circle', lightBg: '#fde8e8', darkBg: '#3b1111', lightText: '#991b1b', darkText: '#f87171'},
-  info: {icon: 'information', lightBg: '#d1ecf1', darkBg: '#0c2d3e', lightText: '#0c5460', darkText: '#67d7e8'},
-  warning: {icon: 'alert', lightBg: '#fef3cd', darkBg: '#3d2e05', lightText: '#856404', darkText: '#fbbf24'},
+const iconMap: Record<ToastType, string> = {
+  success: 'check-circle-outline',
+  error: 'alert-circle-outline',
+  info: 'information-outline',
+  warning: 'alert-outline',
 };
 
 export const Toast: React.FC = () => {
@@ -21,34 +21,29 @@ export const Toast: React.FC = () => {
 
   if (!visible || !message) {return null;}
 
-  const config = toastConfig[type];
-  const bgColor = theme.isDark ? config.darkBg : config.lightBg;
-  const textColor = theme.isDark ? config.darkText : config.lightText;
+  const isDanger = type === 'error';
 
   return (
     <Animated.View
-      entering={FadeInUp.duration(250).springify().damping(18)}
-      exiting={FadeOutUp.duration(200)}
+      entering={FadeInDown.duration(220).springify().damping(20)}
+      exiting={FadeOutDown.duration(180)}
       style={[
         styles.container,
-        designTokens.elevation.medium,
         {
-          top: insets.top + designTokens.spacing.sm,
-          backgroundColor: bgColor,
+          bottom: insets.bottom + designTokens.spacing.xxl,
+          backgroundColor: isDanger ? theme.colors.dangerContainer : theme.colors.text,
+          borderColor: isDanger ? theme.colors.danger : 'transparent',
         },
       ]}
       pointerEvents="none">
       <View style={styles.content}>
         <MaterialCommunityIcons
-          name={config.icon}
-          size={designTokens.iconSize.md}
-          color={textColor}
+          name={iconMap[type]}
+          size={designTokens.iconSize.sm}
+          color={isDanger ? theme.colors.danger : theme.colors.surface}
         />
         <Text
-          style={[
-            designTokens.typography.bodySmall,
-            {color: textColor, flex: 1},
-          ]}
+          style={[styles.message, {color: isDanger ? theme.colors.danger : theme.colors.surface}]}
           numberOfLines={2}>
           {message}
         </Text>
@@ -60,16 +55,21 @@ export const Toast: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: designTokens.spacing.lg,
-    right: designTokens.spacing.lg,
+    left: designTokens.spacing.xl,
+    right: designTokens.spacing.xl,
     zIndex: 9999,
-    borderRadius: designTokens.radius.md,
+    borderRadius: designTokens.radius.lg,
+    borderWidth: 1,
     paddingVertical: designTokens.spacing.md,
     paddingHorizontal: designTokens.spacing.lg,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: designTokens.spacing.md,
+    gap: designTokens.spacing.sm,
+  },
+  message: {
+    ...designTokens.typography.bodySmall,
+    flex: 1,
   },
 });

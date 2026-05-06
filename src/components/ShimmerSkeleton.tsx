@@ -1,4 +1,3 @@
-// components/ShimmerNoGradient.tsx
 import React, {useEffect} from 'react';
 import {StyleSheet, Dimensions, View} from 'react-native';
 import Animated, {
@@ -21,43 +20,30 @@ interface ShimmerProps {
 export const Shimmer: React.FC<ShimmerProps> = ({
   width,
   height,
-  borderRadius = 8,
+  borderRadius = 6,
   isDark = false,
 }) => {
   const translateX = useSharedValue(-SCREEN_WIDTH);
 
   useEffect(() => {
     translateX.value = withRepeat(
-      withTiming(SCREEN_WIDTH, {
-        duration: 1000,
-        easing: Easing.linear,
-      }),
+      withTiming(SCREEN_WIDTH, {duration: 1000, easing: Easing.linear}),
       -1,
       false,
     );
-  }, []);
+  }, [translateX]);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{translateX: translateX.value}],
   }));
 
-  const baseColor = isDark ? '#2a2f3a' : '#e0e0e0';
-  const shineColor = isDark ? '#3a4050' : '#f2f2f2';
+  const baseColor = isDark ? '#1c1c1c' : '#e4e4e7';
+  const shineColor = isDark ? '#2a2a2a' : '#f4f4f5';
 
   return (
-    <View
-      style={[
-        styles.container,
-        {width, height, borderRadius, backgroundColor: baseColor},
-      ]}>
+    <View style={[styles.container, {width, height, borderRadius, backgroundColor: baseColor}]}>
       <Animated.View
-        style={[
-          styles.shimmer,
-          animStyle,
-          {
-            backgroundColor: shineColor,
-          },
-        ]}
+        style={[styles.shimmer, animStyle, {backgroundColor: shineColor}]}
       />
     </View>
   );
@@ -70,7 +56,7 @@ const styles = StyleSheet.create({
   shimmer: {
     position: 'absolute',
     height: '100%',
-    width: 80, // width of moving shine
-    opacity: 0.4,
+    width: 80,
+    opacity: 0.6,
   },
 });
